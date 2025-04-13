@@ -1,0 +1,191 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  CloudFormation template for deploying gt-sf-connector Express APIs
+
+Parameters:
+  StackName:
+    Type: String
+    Default: "gt-sf-connector-middleware-api"
+    Description: "The name of the stack"
+  Environment:
+    Type: String
+    Default: "development"
+    AllowedValues:
+      - development
+      - qa
+      - uat
+      - production
+    Description: "The environment to deploy the resources in"
+  S3BucketName:
+    Type: String
+    Default: "gt-sf-connector-middleware-api-deployments-bucket"
+    Description: "The S3 bucket to store the Lambda function zip file"
+  LambdaS3Key:
+    Type: String
+    Description: "The S3 key of the Lambda function zip file"
+
+
+Conditions:
+  IsProduction: !Equals [!Ref Environment, "production"]
+
+Resources:
+
+  ExpressApiLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${StackName}-lambda-${Environment}"
+      Handler: handler.handler
+      Runtime: nodejs20.x
+      Code:
+        S3Bucket: !Sub "${S3BucketName}-${Environment}"
+        S3Key: !Ref LambdaS3Key
+      MemorySize: 512
+      Timeout: 30
+      Environment:
+        Variables:
+          MONGO_URI: "*"
+          JWT_ACCESS_SECRET: "*"
+          JWT_REFRESH_SECRET: "*"
+          JWT_EMAIL_SECRET: "*"
+          DB_NAME: "*"
+          NODE_ENV: !Ref Environment
+          EMAIL_USER: "*"
+          EMAIL_PASSWORD: "*"
+          CLIENT_ID: "*"
+          CLIENT_SECRET: "*"
+          ENABLE_ENCRYPTION: "*"
+          ENCOMPASS_API_BASE_URL: "*"
+          ENCOMPASS_API_LOAN_PIPELINE_URL: "*"
+          ENCOMPASS_API_OAUTH_URL: "*"
+          ENCRYPTION_KEY: "*"
+          FRONTEND_URL: "*"
+          GRANT_TYPE: "*"
+          PASSWORD: "*"
+          USERNAME: "*"
+      Role: !GetAtt ExpressApiLambdaExecutionRole.Arn
+
+  ExpressApiLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${StackName}-LambdaExecutionRole-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "LambdaExecutionPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+  ExpressApiLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${StackName}-lambda-${Environment}"
+      RetentionInDays: 14
+
+  ExpressApiLambdaInvokePermissionApiGateway:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ExpressApiLambdaFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ExpressApi}/*"
+
+  ExpressApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "${StackName}-${Environment}"
+      Description: "API Gateway for gt-sf-connector Express APIs"
+  
+  ExpressApiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt ExpressApi.RootResourceId
+      PathPart: "{proxy+}"
+      RestApiId: !Ref ExpressApi
+
+  ExpressApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: ANY
+      ResourceId: !Ref ExpressApiResource
+      RestApiId: !Ref ExpressApi
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ExpressApiLambdaFunction.Arn}/invocations"
+            
+  ExpressApiOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      ResourceId: !Ref ExpressApiResource
+      RestApiId: !Ref ExpressApi
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://app.gt-sf-connectorsavings.com'"
+            method.response.header.Access-Control-Allow-Credentials: "'true'"
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'https://app.gt-sf-connectorsavings.com'"
+              method.response.header.Access-Control-Allow-Credentials: "'true'"
+
+  ExpressApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref ExpressApi
+      StageName: !Ref Environment
+    DependsOn:
+      - ExpressApiMethod
+      - ExpressApiOptionsMethod
+
+  CustomDomainName:
+    Type: AWS::ApiGateway::DomainName
+    Condition: IsProduction
+    Properties:
+      DomainName: "api.gt-sf-connectorsavings.com"
+      CertificateArn: "arn:aws:acm:us-east-1:528757794401:certificate/31ba9d7c-5940-4622-b357-b27920ac52a0"
+      EndpointConfiguration:
+        Types:
+          - EDGE
+
+  BasePathMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Condition: IsProduction
+    Properties:
+      DomainName: !Ref CustomDomainName
+      RestApiId: !Ref ExpressApi
+      Stage: !Ref Environment
+
+  Route53RecordSet:
+    Type: AWS::Route53::RecordSet
+    Condition: IsProduction
+    Properties:
+      HostedZoneId: "Z0866968UWYY2QXWPSWL"
+      Name: "api.gt-sf-connectorsavings.com"
+      Type: CNAME
+      TTL: 3600
+      ResourceRecords:
+        - !GetAtt CustomDomainName.DistributionDomainName
