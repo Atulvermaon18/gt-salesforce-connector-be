@@ -43,7 +43,7 @@ Resources:
       Timeout: 30
       Environment:
         Variables:
-          MONGO_URI: "*"
+          MONGO_URI: "mongodb+srv://atul:uP3ygrAzZSVneA6s@cluster0.jt34u.mongod"
           JWT_ACCESS_SECRET: "*"
           JWT_REFRESH_SECRET: "*"
           JWT_EMAIL_SECRET: "*"
