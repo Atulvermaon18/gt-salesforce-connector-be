@@ -28,7 +28,6 @@ const registerSchema = Joi.object({
   lastName: Joi.string().optional().allow('', null),
   email: Joi.string().required(),
   phoneNumber: Joi.string().optional().allow('', null),
-  nmlsID: Joi.string().allow('', null),
   role: Joi.optional().allow(null),
 });
 
