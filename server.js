@@ -49,7 +49,7 @@ if (process.env.ENABLE_ENCRYPTION == 'true') {
 app.use(responseHandler);
 app.use(activityLogger);
 
-setupOAuthRoutes(app);
+process.env.EMAIL_PROVIDER !== 'gmail' ? setupOAuthRoutes(app) : null;
 
 // Routes
 app.use('/api/users', userRoutes);
