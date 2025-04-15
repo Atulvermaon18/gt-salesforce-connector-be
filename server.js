@@ -7,6 +7,7 @@ const cors = require('cors');
 const userRoutes = require('./routes/userRoutes.js');
 const roleRoutes = require('./routes/roleRoutes.js');
 const permissionRoutes = require('./routes/permissionRoutes.js');
+const salesforceRoutes = require('./routes/salesforceRoutes.js');
 const activityLogger = require('./middlewares/activityLogger.js');
 const responseHandler = require('./middlewares/responseHandler.js');
 const securityMiddleware = require('./middlewares/securityMiddleware.js');
@@ -55,10 +56,12 @@ process.env.EMAIL_PROVIDER !== 'gmail' ? setupOAuthRoutes(app) : null;
 app.use('/api/users', userRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/permissions", permissionRoutes);
-app.use("/api/salesforce", require('./routes/salesforceRoutes.js'));
+app.use("/api/salesforce", salesforceRoutes);
+
 app.get('/', (req, res) => {
   res.json({ message: 'Success' });
 });
+
 app.use('/callback', (req, res) => {
   const { code } = req.query;
   if (!code) {
@@ -66,8 +69,9 @@ app.use('/callback', (req, res) => {
   }
   res.status(200).json({ message: 'Callback received', code });
 });
+
 app.use(notFound);
 
 // module.exports = app;
 
-app.listen(3000, () => console.log(`Server is Running on Port http://localhost:3000`));
+app.listen(5000, () => console.log(`Server is Running on Port http://localhost:5000`));
