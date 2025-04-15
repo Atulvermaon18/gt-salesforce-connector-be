@@ -55,12 +55,19 @@ setupOAuthRoutes(app);
 app.use('/api/users', userRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/permissions", permissionRoutes);
+app.use("/api/salesforce", require('./routes/salesforceRoutes.js'));
 app.get('/', (req, res) => {
   res.json({ message: 'Success' });
 });
-
+app.use('/callback', (req, res) => {
+  const { code } = req.query;
+  if (!code) {
+      return res.status(400).json({ message: 'Authorization code is missing' });
+  }
+  res.status(200).json({ message: 'Callback received', code });
+});
 app.use(notFound);
 
 // module.exports = app;
 
-app.listen(5000, () => console.log(`Server is Running on Port http://localhost:5000`));
+app.listen(3000, () => console.log(`Server is Running on Port http://localhost:3000`));
