@@ -983,3 +983,44 @@ exports.getProfileImage = asyncHandler(async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+//@desc     Assign Org ID to User
+//@route    POST api/users/assign-org-id
+//@access   Private/Admin
+exports.assignOrgId = asyncHandler(async (req, res) => {
+  try {
+    const { userId, orgId } = req.body;
+
+    // Validate input
+    if (!userId || !orgId) {
+      return res.status(400).json({ message: "User ID and Org ID are required" });
+    }
+
+    // Fetch the user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if the orgId already exists in the user's orgIds array
+    if (user.orgIds.includes(orgId)) {
+      return res.status(400).json({ message: "Org ID is already assigned to the user" });
+    }
+
+    // Add the orgId to the user's orgIds array
+    user.orgIds.push(orgId);
+    await user.save();
+
+    res.status(200).json({
+      message: "Org ID assigned to user successfully",
+      user: {
+        _id: user._id,
+        userName: user.userName,
+        orgIds: user.orgIds,
+      },
+    });
+  } catch (error) {
+    console.error("Error assigning Org ID to user:", error.message);
+    res.status(500).json({ message: "Error assigning Org ID to user" });
+  }
+});

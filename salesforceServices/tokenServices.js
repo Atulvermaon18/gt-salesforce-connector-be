@@ -1,5 +1,6 @@
 const axios = require('axios');
 const qs = require('qs');
+const SalesforceToken = require('../models/salesforceOrgModel.js'); // Import your token model
 
 /**
  * Exchanges the Salesforce authorization code for an access token.
@@ -49,9 +50,19 @@ const exchangeAuthCodeForToken = async (authCode, baseURL) => {
  * @param {string} baseURL - The base URL for the Salesforce environment (production or sandbox).
  * @returns {Promise<Object>} - The response from Salesforce containing the new access token and other details.
  */
-const getNewTokens = async (refreshToken, baseURL) => {
+const getNewTokens = async (refreshToken, environment) => {
     try {
-        // Configure the request
+        let baseURL = ""
+        if (environment.toLowerCase() === "production") {
+            baseURL = process.env.SALESFORCE_PROD_URL
+        } else if (environment.toLowerCase() === "sandbox") {
+            baseURL = process.env.SALESFORCE_SANDBOX_URL
+        } else {
+            const error = new Error("Invalid environment");
+            error.errorCode = "MW_019";
+            throw error;
+        }
+        
         const config = {
             method: 'post',
             maxBodyLength: Infinity,
@@ -84,7 +95,81 @@ const getNewTokens = async (refreshToken, baseURL) => {
     }
 };
 
+/**
+ * Reusable function to handle Salesforce API requests with retry logic.
+ * @param {Object} config - Axios request configuration.
+ * @param {Object} token - The Salesforce token object containing accessToken, refreshToken, etc.
+ * @param {string} userId - The ID of the user making the request.
+ * @returns {Promise<Object>} - The response from the Salesforce API.
+ */
+const salesforceApiRequest = async (config, token) => {
+    try {
+        // Add Authorization header to the request
+        config.headers = {
+            ...config.headers,
+            Authorization: `Bearer ${token.accessToken}`,
+        };
+
+        // Make the initial request
+        const response = await axios.request(config);
+        return response.data;
+    } catch (error) {
+        console.error('Error making Salesforce API request:', error.response?.data || error.message);
+
+        // Handle 401 Unauthorized error
+        if (error.response?.status === 401) {
+            console.log('Access token expired. Attempting to refresh the token...');
+            const newTokenData = await getNewTokens(token.refreshToken, token.environment);
+
+            // Update the token in the database
+            await SalesforceToken.findOneAndUpdate(
+                { orgId: token.orgId },
+                {
+                    accessToken: newTokenData.access_token,
+                    instanceUrl: newTokenData.instance_url,
+                    refreshToken: newTokenData.refresh_token,
+                    idToken: newTokenData.id_token,
+                    issuedAt: new Date(parseInt(newTokenData.issued_at)),
+                    tokenType: newTokenData.token_type,
+                },
+                { new: true, upsert: true }
+            );
+
+            // Retry the request with the new access token
+            config.headers.Authorization = `Bearer ${newTokenData.access_token}`;
+            const retryResponse = await axios.request(config);
+            return retryResponse.data;
+        }
+
+        // Handle other error codes
+        if (error.response?.status === 403) {
+            throw new Error('Forbidden: Access denied to the requested resource');
+        }
+        if (error.response?.status === 404) {
+            throw new Error('Not Found: The requested resource does not exist');
+        }
+        if (error.response?.status === 500) {
+            throw new Error('Internal Server Error: Salesforce server issue');
+        }
+        if (error.response?.status === 503) {
+            throw new Error('Service Unavailable: Salesforce service is temporarily unavailable');
+        }
+        if (error.response?.status === 429) {
+            throw new Error('Too Many Requests: Rate limit exceeded');
+        }
+        if (error.response?.status === 400) {
+            throw new Error('Bad Request: Invalid request parameters');
+        }
+
+        // Throw a generic error if no specific status code is matched
+        throw new Error(
+            error.response?.data?.error_description || 'Failed to make Salesforce API request'
+        );
+    }
+};
+
 module.exports = {
     exchangeAuthCodeForToken,
     getNewTokens,
+    salesforceApiRequest,
 };

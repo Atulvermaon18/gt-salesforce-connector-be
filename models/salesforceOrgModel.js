@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const withBaseSchema = require('./baseSchema.js');
 
-const salesforceTokenSchema = withBaseSchema({
+const salesforceOrgSchema = withBaseSchema({
     accessToken: {
       type: String,
       required: true,
@@ -30,25 +30,27 @@ const salesforceTokenSchema = withBaseSchema({
       type: String,
       required: true,
     },
-    sfOrganizationId: {
-      type: String,
-      required: true,
-      unique: true,
-    },
     environment: {
       type: String,
       enum: ['production', 'sandbox'],
       required: true,
     },
-     userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Users",
-        required: true
-      }
-  },
-  {
-    timestamps: true, // Automatically adds createdAt and updatedAt fields
+    orgId: { 
+      type: String, 
+      unique: true,
+      required: true,
+    },
+    companyId: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: 'Company', 
+      required: true,
+    },
+    identityUrl:{
+        type: String,
+        required: true,
+    }
   }
 );
 
-module.exports = mongoose.model('SalesforceToken', salesforceTokenSchema);
+const salesforceOrg= mongoose.model('SalesforceOrg',salesforceOrgSchema)
+module.exports = salesforceOrg;

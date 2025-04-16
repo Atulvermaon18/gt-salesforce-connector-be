@@ -11,7 +11,7 @@ router.post('/login', validateRequest(loginSchema), userController.login);
 router.post('/logout', userController.logout);
 router.post('/refresh-token', userController.refreshToken);
 router.get('/profile-image', protect, userController.getProfileImage);
-
+router.post('assign-orgId', protect, authorizePermission('SETTINGS'), userController.assignOrgId);
 //logs APIs
 router.get('/logs', protect, authorizePermission(['VIEW_SELF_AUDIT','VIEW_ALL_AUDIT']), userController.getLoginLogoutLogs);
 
