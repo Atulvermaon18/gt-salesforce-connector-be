@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
+const withBaseSchema = require('./baseSchema.js');
 
-const salesforceTokenSchema = new mongoose.Schema(
-  {
+const salesforceTokenSchema = withBaseSchema({
     accessToken: {
       type: String,
       required: true,
@@ -9,6 +9,10 @@ const salesforceTokenSchema = new mongoose.Schema(
     refreshToken: {
       type: String,
       required: true,
+    },
+    idtoken:{
+        type: String,
+        required: true,
     },
     instanceUrl: {
       type: String,
@@ -22,11 +26,11 @@ const salesforceTokenSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    userId: {
+    sfUserId: {
       type: String,
       required: true,
     },
-    organizationId: {
+    sfOrganizationId: {
       type: String,
       required: true,
       unique: true,
@@ -36,6 +40,11 @@ const salesforceTokenSchema = new mongoose.Schema(
       enum: ['production', 'sandbox'],
       required: true,
     },
+     userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Users",
+        required: true
+      }
   },
   {
     timestamps: true, // Automatically adds createdAt and updatedAt fields

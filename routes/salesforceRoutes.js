@@ -4,6 +4,6 @@ const { authorizePermission, protect } = require('../middlewares/authHandler.js'
 
 const router = express.Router();
 
-router.post("/exchangeAuthCode",exchangeAuthCode);
+router.post("/exchangeAuthCode",protect,exchangeAuthCode);
 
 module.exports = router;
