@@ -198,7 +198,6 @@ exports.salesforceGetContactsByOrgId = asyncHandler(async (req, res) => {
                 allContacts[org.orgId] = { error: error.message }; // Log errors for specific orgIds
             }
         }
-
         // Return all contacts for all orgIds
         res.status(200).json(allContacts);
     } catch (error) {
@@ -257,6 +256,39 @@ exports.salesforceDescribe = asyncHandler(async (req, res) => {
         res.status(200).json(objectDescription);
     } catch (error) {
         res.status(500).json({ message: error.message });
+    }
+});
+
+//@desc     Get list of Salesforce connections for a company
+//@route    GET /api/salesforce/company-connections
+//@access   Private/Admin
+exports.getOrgConnections = asyncHandler(async (req, res) => {
+    try {
+        const admin = req.user; // Get the admin's user ID from the request
+
+        // Fetch all Salesforce connections for the admin's company
+        const connections = await SalesforceOrg.find({ companyId: admin.companyId }).populate('companyId', 'name');
+
+        if (!connections || connections.length === 0) {
+            return res.status(404).json({ message: "No Salesforce connections found for this company" });
+        }
+
+        // Return the list of connections
+        res.status(200).json({
+            company: admin.companyId,
+            connections: connections.map(connection => ({
+                orgId: connection.orgId,
+                environment: connection.environment,
+                instanceUrl: connection.instanceUrl,
+                issuedAt: connection.issuedAt,
+                sfUserId: connection.sfUserId,
+                orgName: connection.orgName_sf,
+                status: connection.status,
+            })),
+        });
+    } catch (error) {
+        console.error("Error fetching company connections:", error.message);
+        res.status(500).json({ message: "Error fetching company connections" });
     }
 });
 
