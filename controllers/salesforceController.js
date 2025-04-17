@@ -46,7 +46,7 @@ exports.getConnectionStatus = asyncHandler(async (req, res) => {
 //@access   Public
 exports.generateAuthUrl = asyncHandler(async (req, res) => {
   try {
-    const { environment } = req.query;
+    const { environment, rootOrgName } = req.query;
     
     const clientId = process.env.SALESFORCE_CLIENT_ID;
     const redirectUri = process.env.SALESFORCE_CALLBACK_URL;
@@ -69,8 +69,16 @@ exports.generateAuthUrl = asyncHandler(async (req, res) => {
         throw error;
     }
     
-    // Construct the authorization URL
-    const authUrl = `${baseURL}?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+    const stateData = {
+      environment: environment,
+      rootOrgName: rootOrgName
+    };
+    
+    const state = Buffer.from(JSON.stringify(stateData)).toString('base64');
+    
+    // Construct the authorization URL with the state parameter
+    const authUrl = `${baseURL}?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${encodeURIComponent(state)}`;
+
     
     // Return the URL to the frontend
     return res.json({ authUrl });
@@ -105,14 +113,14 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
 
         // Exchange the auth code for a token
         const response = await exchangeAuthCodeForToken(authCode, baseURL);
-        const tokenData = response.data;
+        const tokenData = response;
 
-        // Call getOrgDetails to fetch organization details
-        const config = {
-            method: 'get',
-            url: `${tokenData.instanceUrl}/services/data/v59.0/sobjects/Organization/${tokenData.id.split('/')[4]}`,
-        };
-        const orgDetails = await salesforceApiRequest(config, tokenData.access_token);
+        // // Call getOrgDetails to fetch organization details
+        // const config = {
+        //     method: 'get',
+        //     url: `${tokenData.instance_url}/services/data/v59.0/sobjects/Organization/${tokenData.id.split('/')[4]}`,
+        // };
+        // const orgDetails = await salesforceApiRequest(config, tokenData);
 
         // Save the company to the database
         let company = await Company.findOne({ name: rootOrgName });
@@ -133,7 +141,7 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
             environment: environment.toLowerCase(),
             sfUserId: tokenData.id.split('/')[3], // Extract sfUserId from the ID URL
             identityUrl: tokenData.id,
-            orgName_sf:orgDetails.Name
+            // orgName_sf:orgDetails.Name
         });
         await salesforceOrg.save();
 
@@ -151,7 +159,10 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
             user.orgIds.push(salesforceOrg._id);
         }
         await user.save();
-        return res.status(204).json({});
+        return res.json({
+            success: true,
+            message: "Salesforce connection successful"
+        });
         
     } catch (error) {
         console.error("Error while exchanging auth code:", error.response?.data || error.message);

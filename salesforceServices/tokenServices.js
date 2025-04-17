@@ -27,7 +27,6 @@ const exchangeAuthCodeForToken = async (authCode, baseURL) => {
                 'code': authCode,
             }),
         };
-
         // Make the request to Salesforce
         const response = await axios.request(config);
 
@@ -107,7 +106,7 @@ const salesforceApiRequest = async (config, token) => {
         // Add Authorization header to the request
         config.headers = {
             ...config.headers,
-            Authorization: `Bearer ${token.accessToken}`,
+            Authorization: `Bearer ${token.access_token}`,
         };
 
         // Make the initial request
