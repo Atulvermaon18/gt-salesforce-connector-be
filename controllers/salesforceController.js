@@ -303,5 +303,63 @@ exports.getOrgConnections = asyncHandler(async (req, res) => {
     }
 });
 
+//@desc     Get list of Salesforce apps for a user
+//@route    GET /api/salesforce/getSalesforceApps
+//@access   Private
+exports.getSalesforceApps = asyncHandler(async (req, res) => {
+  try {
+    const { orgId } = req.query;
+    if (!orgId) {
+      return res.status(400).json({ message: 'orgId is required' });
+    }
+    const org = await SalesforceOrg.findOne({ orgId });
+    if (!org) {
+      return res.status(404).json({ message: 'Salesforce org not found' });
+    }
+    const url = `${org.instanceUrl}/services/data/v57.0/ui-api/apps?formFactor=Large`;
+    const axiosConfig = {
+      method: 'get',
+      url,
+      headers: {
+        Authorization: `Bearer ${org.accessToken}`,
+      },
+    };
+    const response = await axios(axiosConfig);
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error('Error fetching Salesforce apps:', error.message);
+    res.status(500).json({ message: 'Error fetching Salesforce apps', error: error.message });
+  }
+});
+
+//@desc     Get a specific Salesforce app by appId for a user/org
+//@route    GET /api/salesforce/getSalesforceAppById
+//@access   Private
+exports.getSalesforceAppById = asyncHandler(async (req, res) => {
+  try {
+    const { orgId, appId } = req.query;
+    if (!orgId || !appId) {
+      return res.status(400).json({ message: 'orgId and appId are required' });
+    }
+    const org = await require('../models/salesforceOrgModel').findOne({ orgId });
+    if (!org) {
+      return res.status(404).json({ message: 'Salesforce org not found' });
+    }
+    const url = `${org.instanceUrl}/services/data/v57.0/ui-api/apps/${appId}?formFactor=Large`;
+    const axiosConfig = {
+      method: 'get',
+      url,
+      headers: {
+        Authorization: `Bearer ${org.accessToken}`,
+      },
+    };
+    const response = await axios(axiosConfig);
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error('Error fetching Salesforce app:', error.message);
+    res.status(500).json({ message: 'Error fetching Salesforce app', error: error.message });
+  }
+});
+
 
 

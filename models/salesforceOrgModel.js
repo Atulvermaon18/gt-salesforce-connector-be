@@ -61,5 +61,5 @@ const salesforceOrgSchema = withBaseSchema({
   }
 );
 
-const salesforceOrg= mongoose.model('SalesforceOrg',salesforceOrgSchema)
+const salesforceOrg = mongoose.model('SalesforceOrg', salesforceOrgSchema);
 module.exports = salesforceOrg;
