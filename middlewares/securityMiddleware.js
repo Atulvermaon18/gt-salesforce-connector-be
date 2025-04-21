@@ -72,10 +72,13 @@ const hasXSSorHTML = (value) => {
 };
 
 // Recursive function to check all values in an object
-const checkObjectForThreats = (obj, checkFn) => {
+const checkObjectForThreats = (obj, checkFn, excludedKeys = []) => {
     for (let key in obj) {
+        // Skip check if the key is in the excluded list
+        if (excludedKeys.includes(key)) continue;
+        
         if (obj[key] && typeof obj[key] === 'object') {
-            if (checkObjectForThreats(obj[key], checkFn)) return true;
+            if (checkObjectForThreats(obj[key], checkFn, excludedKeys)) return true;
         } else if (checkFn(obj[key])) {
             return true;
         }
@@ -85,6 +88,7 @@ const checkObjectForThreats = (obj, checkFn) => {
 
 // Main security middleware
 const securityMiddleware = [(req, res, next) => {
+    const excludedKeys = ['authCode', 'code'];
     // Check for NoSQL Injection
     if (checkObjectForThreats(req.body, hasNoSQLInjection)) {
         return res.status(400).json({
@@ -108,7 +112,7 @@ const securityMiddleware = [(req, res, next) => {
     }
 
     // Check for XSS and HTML tags
-    if (checkObjectForThreats(req.body, hasXSSorHTML)) {
+    if (checkObjectForThreats(req.body, hasXSSorHTML, excludedKeys)) {
         return res.status(400).json({
             success: false,
             message: 'Potential XSS attack detected in request body'

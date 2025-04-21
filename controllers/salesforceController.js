@@ -46,7 +46,7 @@ exports.getConnectionStatus = asyncHandler(async (req, res) => {
 //@access   Public
 exports.generateAuthUrl = asyncHandler(async (req, res) => {
   try {
-    const { environment } = req.query;
+    const { environment, rootOrgName } = req.query;
     
     const clientId = process.env.SALESFORCE_CLIENT_ID;
     const redirectUri = process.env.SALESFORCE_CALLBACK_URL;
@@ -69,8 +69,16 @@ exports.generateAuthUrl = asyncHandler(async (req, res) => {
         throw error;
     }
     
-    // Construct the authorization URL
-    const authUrl = `${baseURL}?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+    const stateData = {
+      environment: environment,
+      rootOrgName: rootOrgName
+    };
+    
+    const state = Buffer.from(JSON.stringify(stateData)).toString('base64');
+    
+    // Construct the authorization URL with the state parameter
+    const authUrl = `${baseURL}?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${encodeURIComponent(state)}`;
+
     
     // Return the URL to the frontend
     return res.json({ authUrl });
@@ -126,7 +134,7 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
             environment: environment.toLowerCase(),
             sfUserId: tokenData.id.split('/')[3], // Extract sfUserId from the ID URL
             identityUrl: tokenData.id,
-            orgName_sf:orgDetails.Name
+            // orgName_sf:orgDetails.Name
         });
         await salesforceOrg.save();
 
@@ -151,7 +159,10 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
             user.orgIds.push(salesforceOrg._id);
         }
         await user.save();
-        return res.status(204).json({});
+        return res.json({
+            success: true,
+            message: "Salesforce connection successful"
+        });
         
     } catch (error) {
         console.error("Error while exchanging auth code:", error.response?.data || error.message);
@@ -296,6 +307,64 @@ exports.getOrgConnections = asyncHandler(async (req, res) => {
         console.error("Error fetching company connections:", error.message);
         res.status(500).json({ message: "Error fetching company connections" });
     }
+});
+
+//@desc     Get list of Salesforce apps for a user
+//@route    GET /api/salesforce/getSalesforceApps
+//@access   Private
+exports.getSalesforceApps = asyncHandler(async (req, res) => {
+  try {
+    const { orgId } = req.query;
+    if (!orgId) {
+      return res.status(400).json({ message: 'orgId is required' });
+    }
+    const org = await SalesforceOrg.findOne({ orgId });
+    if (!org) {
+      return res.status(404).json({ message: 'Salesforce org not found' });
+    }
+    const url = `${org.instanceUrl}/services/data/v57.0/ui-api/apps?formFactor=Large`;
+    const axiosConfig = {
+      method: 'get',
+      url,
+      headers: {
+        Authorization: `Bearer ${org.accessToken}`,
+      },
+    };
+    const response = await axios(axiosConfig);
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error('Error fetching Salesforce apps:', error.message);
+    res.status(500).json({ message: 'Error fetching Salesforce apps', error: error.message });
+  }
+});
+
+//@desc     Get a specific Salesforce app by appId for a user/org
+//@route    GET /api/salesforce/getSalesforceAppById
+//@access   Private
+exports.getSalesforceAppById = asyncHandler(async (req, res) => {
+  try {
+    const { orgId, appId } = req.query;
+    if (!orgId || !appId) {
+      return res.status(400).json({ message: 'orgId and appId are required' });
+    }
+    const org = await require('../models/salesforceOrgModel').findOne({ orgId });
+    if (!org) {
+      return res.status(404).json({ message: 'Salesforce org not found' });
+    }
+    const url = `${org.instanceUrl}/services/data/v57.0/ui-api/apps/${appId}?formFactor=Large`;
+    const axiosConfig = {
+      method: 'get',
+      url,
+      headers: {
+        Authorization: `Bearer ${org.accessToken}`,
+      },
+    };
+    const response = await axios(axiosConfig);
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error('Error fetching Salesforce app:', error.message);
+    res.status(500).json({ message: 'Error fetching Salesforce app', error: error.message });
+  }
 });
 
 

@@ -23,6 +23,13 @@ exports.login = asyncHandler(async (req, res) => {
           path: 'permissions',
           select: '_id name qCode'
         }
+      })
+      .populate({
+        path: 'orgIds',
+        select: '_id environment status'
+      }).populate({
+        path: 'companyId',
+        select: '_id name'
       });
 
     // Check if user exists and is active
@@ -31,24 +38,24 @@ exports.login = asyncHandler(async (req, res) => {
         message: !user ? "Invalid email" : "Account is inactive. Please contact administrator."
       });
     }
-    
+
     if (user.password && (await user.matchPassword(password))) {
       user.tokenVersion++;
 
       const accessToken = generateAccessToken(user._id, user.tokenVersion);
       const refreshToken = generateRefreshToken(user._id);
-      
+
       await invalidateUserSessions(user._id);
 
       if (user.temporaryPassword) {
         user.temporaryPassword = null;
       }
-      
+
       await Promise.all([
         user.save(),
         Session.create({
           userId: user._id, userName: user.userName,
-          refreshToken, 
+          refreshToken,
           userAgent: req.headers['user-agent']
         })
       ]);
@@ -83,6 +90,8 @@ exports.login = asyncHandler(async (req, res) => {
         phoneNumber: user.phoneNumber,
         email: user.email,
         isActive: user.isActive,
+        companyId: user.companyId,
+        orgIds: user.orgIds,
         role,
         token: accessToken,
       });

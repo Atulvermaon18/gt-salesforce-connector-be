@@ -6,5 +6,5 @@ const companySchema = withBaseSchema({
 });
 
 
-const Company = mongoose.model("Companys", companySchema);
+const Company = mongoose.model("Company", companySchema);
 module.exports = Company;
