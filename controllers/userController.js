@@ -8,6 +8,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const Session = require('../models/sessionModel.js');
+const SalesforceOrg = require('../models/salesforceOrgModel.js');
 
 //@desc     Auth User & Get Token
 //@route    POST api/users/login
@@ -1008,13 +1009,19 @@ exports.assignOrgId = asyncHandler(async (req, res) => {
     // Fetch the user
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(500).json({ message: "User not found" });
     }
 
     // Check if the orgId already exists in the user's orgIds array
     if (user.orgIds.includes(orgId)) {
-      return res.status(400).json({ message: "Org ID is already assigned to the user" });
+      return res.status(500).json({ message: "Org ID is already assigned to the user" });
     }
+
+    await SalesforceOrg.findById(orgId).select('orgId').then((org) => {
+      if (!org) {
+        return res.status(500).json({ message: "Org ID not found" });
+      }
+    });
 
     // Add the orgId to the user's orgIds array
     user.orgIds.push(orgId);
