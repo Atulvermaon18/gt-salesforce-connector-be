@@ -105,14 +105,7 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
 
         // Exchange the auth code for a token
         const response = await exchangeAuthCodeForToken(authCode, baseURL);
-        const tokenData = response.data;
-
-        // Call getOrgDetails to fetch organization details
-        const config = {
-            method: 'get',
-            url: `${tokenData.instanceUrl}/services/data/v59.0/sobjects/Organization/${tokenData.id.split('/')[4]}`,
-        };
-        const orgDetails = await salesforceApiRequest(config, tokenData.access_token);
+        const tokenData = response;
 
         // Save the company to the database
         let company = await Company.findOne({ name: rootOrgName });
@@ -136,6 +129,13 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
             orgName_sf:orgDetails.Name
         });
         await salesforceOrg.save();
+
+        // Call getOrgDetails to fetch organization details
+        const config = {
+            method: 'get',
+            url: `${tokenData.instance_url}/services/data/v59.0/sobjects/Organization/${tokenData.id.split('/')[4]}`,
+        };
+        const orgDetails = await salesforceApiRequest(config, tokenData.access_token);
 
         // Associate the user with the company and org ID
         const user = await User.findById(req.user._id);
@@ -227,6 +227,12 @@ exports.salesforceCreateConatactsByOrgId = asyncHandler(async (req, res) => {
 
             // Create contact in Salesforce
             const createdContact = await salesforceApiRequest(config, token);
+            if (createdContact.newAccessToken){
+                token.accessToken = createdContact.newAccessToken;
+                token.refreshToken = createdContact.newRefreshToken
+                token.idToken = createdContact.newIdToken // Update the token with the new access token
+            }
+            
             createdContacts.push(createdContact);
         }
 

@@ -138,6 +138,10 @@ const salesforceApiRequest = async (config, token) => {
             // Retry the request with the new access token
             config.headers.Authorization = `Bearer ${newTokenData.access_token}`;
             const retryResponse = await axios.request(config);
+            retryResponse.data.newAccessToken = newTokenData.access_token; // Add new access token to response
+            retryResponse.data.newRefreshToken = newTokenData.refresh_token; // Add new refresh token to response
+            retryResponse.data.newIdToken = newTokenData.id_token; // Add new id token to response
+            retryResponse.data.newIssuedAt = new Date(parseInt(newTokenData.issued_at)); // Add new issued at to response
             return retryResponse.data;
         }
 

@@ -3,7 +3,8 @@ const { exchangeAuthCode,
     generateAuthUrl, 
     getConnectionStatus,
     salesforceGetContactsByOrgId,
-getOrgConnections } = require("../controllers/salesforceController.js");
+getOrgConnections,
+salesforceCreateConatactsByOrgId} = require("../controllers/salesforceController.js");
 const { authorizePermission, protect } = require('../middlewares/authHandler.js');
 
 const router = express.Router();
@@ -13,5 +14,6 @@ router.post("/exchangeAuthCode", protect, authorizePermission("SETTINGS"), excha
 router.get("/connection-status", protect, authorizePermission("SETTINGS"), getConnectionStatus);
 router.get("/contacts",protect, authorizePermission("SETTINGS"), salesforceGetContactsByOrgId);
 router.get("/retriveOrg",protect, authorizePermission("SETTINGS"), getOrgConnections);
+router.post("/contacts",protect, authorizePermission("SETTINGS"), salesforceCreateConatactsByOrgId);
 
 module.exports = router;
