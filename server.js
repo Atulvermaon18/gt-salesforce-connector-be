@@ -9,6 +9,7 @@ const roleRoutes = require('./routes/roleRoutes.js');
 const permissionRoutes = require('./routes/permissionRoutes.js');
 const salesforceRoutes = require('./routes/salesforceRoutes.js');
 const activityLogger = require('./middlewares/activityLogger.js');
+const orgRoutes = require('./routes/orgRoutes.js');
 const responseHandler = require('./middlewares/responseHandler.js');
 const securityMiddleware = require('./middlewares/securityMiddleware.js');
 const { notFound, errorHandler } = require('./middlewares/errorHandler.js');
@@ -57,6 +58,7 @@ app.use('/api/users', userRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/permissions", permissionRoutes);
 app.use("/api/salesforce", salesforceRoutes);
+// app.use('/api',orgRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'Success' });
@@ -74,4 +76,4 @@ app.use(notFound);
 
 // module.exports = app;
 
-app.listen(5000, () => console.log(`Server is Running on Port http://localhost:5000`));
+app.listen(3000, () => console.log(`Server is Running on Port http://localhost:5000`));
