@@ -143,7 +143,7 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
             method: 'get',
             url: `${tokenData.instance_url}/services/data/v59.0/sobjects/Organization/${tokenData.id.split('/')[4]}`,
         };
-        const orgDetails = await salesforceApiRequest(config, tokenData.access_token);
+        const orgDetails = await salesforceApiRequest(config, tokenData);
 
         // Associate the user with the company and org ID
         const user = await User.findById(req.user._id);
@@ -172,6 +172,9 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
     }
 });
 
+//@desc     Get contacts from Salesforce
+//@route    GET /api/salesforce/contacts
+//@access   Private
 exports.salesforceGetContactsByOrgId = asyncHandler(async (req, res) => {
     try {
         const user = req.user // Get the user ID from the request
@@ -187,9 +190,9 @@ exports.salesforceGetContactsByOrgId = asyncHandler(async (req, res) => {
         for (const org of user.orgIds) {
             try {
                 // Fetch the Salesforce token for the orgId
-                const token = await SalesforceToken.findOne({ orgId: org._id }).sort({ updatedAt: -1 });
+                const token = await SalesforceToken.findOne({ _id: org }).sort({ updatedAt: -1 });
                 if (!token) {
-                    allContacts[org.orgId] = { error: 'No Salesforce connection found for this orgId' };
+                    allContacts[token.orgId] = { error: 'No Salesforce connection found for this orgId' };
                     continue;
                 }
 
@@ -203,10 +206,10 @@ exports.salesforceGetContactsByOrgId = asyncHandler(async (req, res) => {
 
                 // Fetch contacts from Salesforce
                 const contacts = await salesforceApiRequest(config, token);
-                allContacts[org.orgId] = contacts.records; // Store contacts for this orgId
+                allContacts[token.orgId] = contacts.records; // Store contacts for this orgId
             } catch (error) {
-                console.error(`Error fetching contacts for orgId ${org._id}:`, error.message);
-                allContacts[org.orgId] = { error: error.message }; // Log errors for specific orgIds
+                console.error(`Error fetching contacts for orgId ${org}:`, error.message);
+                allContacts[token.orgId] = { error: error.message }; // Log errors for specific orgIds
             }
         }
         // Return all contacts for all orgIds
@@ -257,22 +260,27 @@ exports.salesforceCreateConatactsByOrgId = asyncHandler(async (req, res) => {
 
 exports.salesforceDescribe = asyncHandler(async (req, res) => {
     try {
-        const userId = req.user._id; // Get the user ID from the request
-        const token = await SalesforceToken.findOne({ userId }).sort({ updatedAt: -1 });
-
-        if (!token) {
-            return res.status(401).json({ message: 'No Salesforce connection found. Please authenticate first.' });
+        const { objectApiName, orgId } = req.query;
+        if (!orgId) {
+          return res.status(400).json({ message: 'orgId is required' });
+        }
+        const org = await SalesforceToken.findOne({ orgId });
+        if (!org) {
+          return res.status(404).json({ message: 'Salesforce org not found' });
         }
 
         const config = {
             method: 'get',
-            url: `${token.instanceUrl}/services/data/v56.0/sobjects/Contact/describe`,
+            url: `${org.instanceUrl}/services/data/v57.0/sobjects/${objectApiName}/describe`,
         };
 
-        const objectDescription = await salesforceApiRequest(config, token, userId);
+        const objectDescription = await salesforceApiRequest(config, org);
+        delete objectDescription.childRelationships;
+        delete objectDescription.urls;
         res.status(200).json(objectDescription);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error("Error fetching Salesforce object description:", error.message);
+        res.status(500).json({ message: "Error fetching Salesforce object description" });
     }
 });
 
@@ -347,7 +355,7 @@ exports.getSalesforceAppById = asyncHandler(async (req, res) => {
     if (!orgId || !appId) {
       return res.status(400).json({ message: 'orgId and appId are required' });
     }
-    const org = await require('../models/salesforceOrgModel').findOne({ orgId });
+    const org = await SalesforceToken.findOne({ orgId });
     if (!org) {
       return res.status(404).json({ message: 'Salesforce org not found' });
     }

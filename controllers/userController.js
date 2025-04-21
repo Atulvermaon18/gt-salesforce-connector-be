@@ -27,7 +27,7 @@ exports.login = asyncHandler(async (req, res) => {
       })
       .populate({
         path: 'orgIds',
-        select: '_id environment status'
+        select: '_id environment status orgId'
       }).populate({
         path: 'companyId',
         select: '_id name'
