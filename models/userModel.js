@@ -61,9 +61,10 @@ const userSchemaDefinition = {
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'Company',
   },
-  orgIds: [{ 
-      type: String
-    }], 
+  orgIds: [{
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'SalesforceOrg',
+  }], 
 }
 
 const userSchema = withBaseSchema(userSchemaDefinition);

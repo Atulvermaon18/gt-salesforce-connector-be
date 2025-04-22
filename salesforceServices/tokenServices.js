@@ -106,7 +106,7 @@ const salesforceApiRequest = async (config, token) => {
         // Add Authorization header to the request
         config.headers = {
             ...config.headers,
-            Authorization: `Bearer ${token.access_token}`,
+            Authorization: `Bearer ${token.accessToken}`,
         };
 
         // Make the initial request
@@ -114,7 +114,6 @@ const salesforceApiRequest = async (config, token) => {
         return response.data;
     } catch (error) {
         console.error('Error making Salesforce API request:', error.response?.data || error.message);
-
         // Handle 401 Unauthorized error
         if (error.response?.status === 401) {
             console.log('Access token expired. Attempting to refresh the token...');
