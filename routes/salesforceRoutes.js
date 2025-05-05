@@ -6,6 +6,7 @@ const { exchangeAuthCode,
     salesforceDescribe,
     salesforceGetObjectCount,
     getOrgConnections,
+    salesforceGetObjectById,
     salesforceCreateObjectByOrgId } = require("../controllers/salesforceController.js");
 const { authorizePermission, protect } = require('../middlewares/authHandler.js');
 const { getSalesforceApps, getSalesforceAppById } = require('../controllers/salesforceController.js');
@@ -20,6 +21,7 @@ router.get("/objectCount", protect, authorizePermission("SETTINGS"), salesforceG
 router.get("/retriveOrg", protect, authorizePermission("SETTINGS"), getOrgConnections);
 router.get("/describe", protect, authorizePermission("SETTINGS"), salesforceDescribe);
 router.post("/createObject", protect, authorizePermission("SETTINGS"), salesforceCreateObjectByOrgId);
+router.get("/getObjectById", protect, authorizePermission("SETTINGS"), salesforceGetObjectById);
 router.get("/getSalesforceApps", protect, authorizePermission("SETTINGS"), getSalesforceApps);
 router.get("/getSalesforceAppById", protect, authorizePermission("SETTINGS"), getSalesforceAppById);
 

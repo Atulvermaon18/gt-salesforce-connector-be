@@ -136,14 +136,16 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
       identityUrl: tokenData.id,
       // orgName_sf:orgDetails.Name
     });
-    await salesforceOrg.save();
+
+
+    const savedSalesforceOrg = await salesforceOrg.save();
 
     // Call getOrgDetails to fetch organization details
-    const config = {
-      method: 'get',
-      url: `${tokenData.instance_url}/services/data/v59.0/sobjects/Organization/${tokenData.id.split('/')[4]}`,
-    };
-    const orgDetails = await salesforceApiRequest(config, tokenData);
+    // const config = {
+    //   method: 'get',
+    //   url: `${tokenData.instance_url}/services/data/v59.0/sobjects/Organization/${tokenData.id.split('/')[4]}`,
+    // };
+    // const orgDetails = await salesforceApiRequest(config, tokenData);
 
     // Associate the user with the company and org ID
     const user = await User.findById(req.user._id);
@@ -153,10 +155,9 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
 
     // Link the user to the company
     user.companyId = company._id;
-
     // Add the org ID to the user's orgIds array if not already present
-    if (!user.orgIds.includes(salesforceOrg._id)) {
-      user.orgIds.push(salesforceOrg._id);
+    if (!user.orgIds.includes(savedSalesforceOrg._id)) {
+      user.orgIds.push(savedSalesforceOrg._id);
     }
     await user.save();
     return res.json({
@@ -263,9 +264,9 @@ exports.salesforceCreateObjectByOrgId = asyncHandler(async (req, res) => {
       const config = {
         method: 'post',
         url: `${token.instanceUrl}/services/data/v57.0/sobjects/${objectApiName}`,
-        data: object,
+        body: object,
       };
-      console.log(config);
+      console.log(config.url);
       // Create contact in Salesforce
       const createdObject = await salesforceApiRequest(config, token);
       if (createdObject.newAccessToken) {
@@ -279,6 +280,38 @@ exports.salesforceCreateObjectByOrgId = asyncHandler(async (req, res) => {
 
     // Return the created contacts
     return res.json(createdObject);
+  } catch (error) {
+    console.error("Error creating Salesforce contacts:", error.message);
+    return res.status(500).json({ message: "Error creating Salesforce contacts" });
+  }
+});
+
+//@desc     Get a specific object in Salesforce
+//@route    GET /api/salesforce/getObjectById
+//@access   Private
+exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
+  try {
+    const { orgId, objectApiName, objectId } = req.query; 
+
+    // Fetch the Salesforce token for the orgId
+    const token = await SalesforceToken.findOne({ orgId }).sort({ updatedAt: -1 });
+    if (!token) {
+      return res.status(401).json({ message: 'No Salesforce connection found for this orgId' });
+    }
+
+    const config = {
+      method: 'get',
+      url: `${token.instanceUrl}/services/data/v57.0/sobjects/${objectApiName}/${objectId}`,
+    };
+    
+    const dataObject = await salesforceApiRequest(config, token);
+    if (dataObject.newAccessToken) {
+      token.accessToken = dataObject.newAccessToken;
+      token.refreshToken = dataObject.newRefreshToken
+      token.idToken = dataObject.newIdToken
+    }
+
+    return res.json(dataObject);
   } catch (error) {
     console.error("Error creating Salesforce contacts:", error.message);
     return res.status(500).json({ message: "Error creating Salesforce contacts" });
