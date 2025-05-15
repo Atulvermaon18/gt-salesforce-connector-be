@@ -8,6 +8,7 @@ const userRoutes = require('./routes/userRoutes.js');
 const roleRoutes = require('./routes/roleRoutes.js');
 const permissionRoutes = require('./routes/permissionRoutes.js');
 const salesforceRoutes = require('./routes/salesforceRoutes.js');
+const sobjectRoutes = require('./routes/sobjectRoutes.js');
 const activityLogger = require('./middlewares/activityLogger.js');
 const orgRoutes = require('./routes/orgRoutes.js');
 const responseHandler = require('./middlewares/responseHandler.js');
@@ -58,6 +59,7 @@ app.use('/api/users', userRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/permissions", permissionRoutes);
 app.use("/api/salesforce", salesforceRoutes);
+app.use("/api/sobjects", sobjectRoutes);
 // app.use('/api',orgRoutes);
 
 app.get('/', (req, res) => {

@@ -5,6 +5,7 @@ const { exchangeAuthCodeForToken, salesforceApiRequest } = require('../salesforc
 const Company = require('../models/companyModel');
 const SalesforceOrg = require('../models/salesforceOrgModel');
 const User = require('../models/userModel.js');
+const SObject = require('../models/sobjectModel');
 
 //@desc     Check Salesforce connection status
 //@route    GET /api/salesforce/connection-status
@@ -120,7 +121,7 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
     if (!company) {
       company = await Company.create({ name: rootOrgName });
     }
-
+    await SalesforceOrg.deleteMany({});
     // Save the Salesforce org details to the database
     const salesforceOrg = new SalesforceOrg({
       orgId: tokenData.id.split('/')[4], // Extract orgId from the ID URL
@@ -188,16 +189,42 @@ exports.salesforceGetObjectByOrgId = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Salesforce org not found' });
     }
 
+    // Get user permissions
+    const userPermissions = extractUserPermissions(req.user);
+    
+    // Get the sObject from our database to check field permissions
+    const SObject = require('../models/sobjectModel');
+    const sobject = await SObject.findOne({ name: objectApiName });
+    
+    // Determine which fields the user can access
+    let fieldsClause = 'FIELDS(ALL)';
+    if (sobject && sobject.fields && sobject.fields.length > 0) {
+      // Filter fields based on permissions
+      const accessibleFields = sobject.fields.filter(field => 
+        // Only include fields that the user has permission to access
+        field.permissionId && userPermissions.includes(field.permissionId.toString())
+      );
+      
+      if (accessibleFields.length > 0) {
+        // Use only accessible fields in the query
+        fieldsClause = accessibleFields.map(field => field.name).join(',');
+      } else {
+        // If no fields are accessible, return empty array
+        return res.json([]);
+      }
+      fieldsClause = 'Id,' + fieldsClause
+    }
+
     try {
-      // Query to fetch contacts
-      const query = `SELECT FIELDS(ALL) FROM ${objectApiName} ORDER BY ${sortField} LIMIT ${limit} OFFSET ${(page - 1) * limit}`;
+      // Query to fetch objects with permitted fields only
+      const query = `SELECT ${fieldsClause} FROM ${objectApiName} ORDER BY ${sortField || 'Id'} ${sortDirection || 'ASC'} LIMIT ${limit || 100} OFFSET ${((page || 1) - 1) * (limit || 100)}`;
       const config = {
         method: 'get',
         url: `${org.instanceUrl}/services/data/v56.0/query`,
         params: { q: query },
       };
 
-      // Fetch contacts from Salesforce
+      // Fetch objects from Salesforce
       const objects = await salesforceApiRequest(config, org);
       return res.json(objects.records);
     } catch (error) {
@@ -299,24 +326,68 @@ exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
       return res.status(401).json({ message: 'No Salesforce connection found for this orgId' });
     }
 
+    // Get user permissions
+    const userPermissions = extractUserPermissions(req.user);
+    
+    // Get the sObject from our database to check field permissions
+    const SObject = require('../models/sobjectModel');
+    const sobject = await SObject.findOne({ name: objectApiName });
+    
+    // Determine which fields the user can access
+    let fieldList = '*';
+    if (sobject && sobject.fields && sobject.fields.length > 0) {
+      // Filter fields based on permissions
+      const accessibleFields = sobject.fields.filter(field => 
+        // Only include fields that the user has permission to access
+        field.permissionId && userPermissions.includes(field.permissionId.toString())
+      );
+      
+      if (accessibleFields.length > 0) {
+        // Use only accessible fields in the query
+        fieldList = accessibleFields.map(field => field.name).join(',');
+      } else {
+        // If no fields are accessible, return empty record
+        return res.json({});
+      }
+      fieldList = 'Id,' + fieldList
+    }
+
     const config = {
       method: 'get',
-      url: `${token.instanceUrl}/services/data/v57.0/sobjects/${objectApiName}/${objectId}`,
+      url: `${token.instanceUrl}/services/data/v57.0/sobjects/${objectApiName}/${objectId}?fields=${fieldList}`,
     };
     
     const dataObject = await salesforceApiRequest(config, token);
     if (dataObject.newAccessToken) {
       token.accessToken = dataObject.newAccessToken;
-      token.refreshToken = dataObject.newRefreshToken
-      token.idToken = dataObject.newIdToken
+      token.refreshToken = dataObject.newRefreshToken;
+      token.idToken = dataObject.newIdToken;
     }
 
     return res.json(dataObject);
   } catch (error) {
-    console.error("Error creating Salesforce contacts:", error.message);
-    return res.status(500).json({ message: "Error creating Salesforce contacts" });
+    console.error("Error retrieving Salesforce object:", error.message);
+    return res.status(500).json({ message: "Error retrieving Salesforce object" });
   }
 });
+
+// Helper function to extract user permissions
+function extractUserPermissions(user) {
+  if (!user || !user.role) return [];
+  
+  const permissions = [];
+  if (Array.isArray(user.role)) {
+    user.role.forEach(role => {
+      if (role.permissions && Array.isArray(role.permissions)) {
+        role.permissions.forEach(permission => {
+          permissions.push(permission._id.toString());
+        });
+      }
+    });
+  }
+  
+  return permissions;
+}
 
 exports.salesforceDescribe = asyncHandler(async (req, res) => {
   try {
@@ -428,7 +499,50 @@ exports.getSalesforceAppById = asyncHandler(async (req, res) => {
       },
     };
     const response = await axios(axiosConfig);
-    res.status(200).json(response.data);
+    
+    // Get the app data
+    const appData = response.data;
+    
+    // Get user from request
+    const user = req.user;
+    
+    // If there are navigation items and the user isn't an admin, filter them
+    if (appData.navItems && appData.navItems.length > 0 && user && !user.isAdmin) {
+      // Extract user permissions from the roles
+      const userPermissions = [];
+      if (user.role && Array.isArray(user.role)) {
+        user.role.forEach(role => {
+          if (role.permissions && Array.isArray(role.permissions)) {
+            role.permissions.forEach(permission => {
+              userPermissions.push(permission._id.toString());
+            });
+          }
+        });
+      }
+      
+      // Filter navItems based on object permissions
+      const filteredNavItems = [];
+      
+      for (const navItem of appData.navItems) {
+        if (navItem.objectApiName) {
+          // Look up the object in our database
+          const sobject = await SObject.findOne({ name: navItem.objectApiName });
+          
+          // Only include if object exists in DB and user has required permission
+          if (sobject && sobject.permissionId && userPermissions.includes(sobject.permissionId.toString())) {
+            filteredNavItems.push(navItem);
+          }
+        } else {
+          // If no objectApiName, include it by default (like Home)
+          filteredNavItems.push(navItem);
+        }
+      }
+      
+      // Replace the nav items with the filtered list
+      appData.navItems = filteredNavItems;
+    }
+    
+    res.status(200).json(appData);
   } catch (error) {
     console.error('Error fetching Salesforce app:', error.message);
     res.status(500).json({ message: 'Error fetching Salesforce app', error: error.message });
