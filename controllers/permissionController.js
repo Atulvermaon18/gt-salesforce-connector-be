@@ -25,14 +25,13 @@ exports.createPermission = async (req, res) => {
 
         // Check if qCode is empty
         if (!req.body.qCode || !req.body.qCode.trim()) {
-            return res.status(400).json({ message: 'Permission qCode cannot be empty' });
+            return res.status(400).json({ message: 'Permission  cannot be empty' });
         }
 
         // Check if permission with same name or qCode already exists
         const existingPermission = await Permission.findOne({
             $or: [
-                { name: req.body.name.trim() },
-                { qCode: req.body.qCode.trim() }
+                { name: req.body.name.trim() }, 
             ]
         });
 

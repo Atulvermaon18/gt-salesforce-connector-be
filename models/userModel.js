@@ -48,9 +48,9 @@ const userSchemaDefinition = {
   },
 
   role: {
-    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Roles' }],
-    required: true,
-    default: []
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Roles',
+    required: false
   },
 
   tokenVersion: {
@@ -73,7 +73,9 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-userSchema.index({ email: 1, isActive: 1,role: 1 });  
+// Create indexes
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ isActive: 1 });
 
 userSchema.pre('save', async function (next) {
   // Only proceed if either password or temporaryPassword has been modified
@@ -93,22 +95,14 @@ userSchema.pre('save', async function (next) {
     this.temporaryPassword = await bcrypt.hash(this.temporaryPassword, salt);
   }
 
-  // Only proceed if role is not set
-  if (this.role && this.role.length > 0) {
-    return next();
-  }
-
-  try {
-    // Find the role with qCode "USER"
-    const defaultRole = await mongoose.model('Roles').findOne({ qCode: 'USER' });
-    if (defaultRole) {
-      this.role = [defaultRole._id];
-    }
-    next();
-  } catch (error) {
-    next(error);
-  }
+  next();
 });
 
 const User = mongoose.model('Users', userSchema);
+
+// Drop any problematic indexes
+User.collection.dropIndex('this_1').catch(() => {
+  // Ignore error if index doesn't exist
+});
+
 module.exports = User;

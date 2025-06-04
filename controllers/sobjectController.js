@@ -191,17 +191,17 @@ exports.saveSObjectPermission = async (req, res, next) => {
     }
 
     // Validate permission if provided
-    if (permissionId) {
-      const permissionExists = await Permission.exists({ _id: permissionId });
-      if (!permissionExists) {
-        return next(createError(400, 'Invalid permission ID'));
-      }
-    }
+    // if (permissionId) {
+    //   const permissionExists = await Permission.exists({ _id: permissionId });
+    //   if (!permissionExists) {
+    //     return next(createError(400, 'Invalid permission ID'));
+    //   }
+    // }
 
     // Find and update the sObject
     const updatedSObject = await SObject.findOneAndUpdate(
       { name: sobjectName },
-      { permissionId: permissionId || null },
+      { permissionId: permissionId },
       { new: true }
     );
 

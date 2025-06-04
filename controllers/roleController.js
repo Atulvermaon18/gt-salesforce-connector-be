@@ -2,163 +2,188 @@ const Role = require("../models/roleModel.js");
 const Permission = require("../models/permissionModel.js");
 const mongoose = require('mongoose');
 const User = require('../models/userModel.js');
+const asyncHandler = require('express-async-handler');
 
 //@desc     Get all roles
-//@route    GET /api/roles
-//@access   Public
-exports.getRoles = async (req, res) => {
-    try {
-        const roles = await Role.find().select('_id name description qCode').populate({
+//@route    GET api/roles
+//@access   Private/Admin
+exports.getRoles = asyncHandler(async (req, res) => {
+    const roles = await Role.find({})
+        .populate({
             path: 'permissions',
-            select: '_id name description qCode' // Specify the fields to include
-        });
-        res.json(roles);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-//@desc     Create a new role
-//@route    POST /api/roles
-//@access   Private
-exports.createRole = async (req, res) => {
-    try {
-        const { name, description, permissions, qCode } = req.body;
-
-        if (!name || !name.trim()) {
-            return res.status(400).json({ message: 'Role name cannot be empty' });
-        }
-
-        // Check if qCode is empty
-        if (!qCode || !qCode.trim()) {
-            return res.status(400).json({ message: 'Role qCode cannot be empty' });
-        }
-        // Check if a role with the same name or qCode already exists
-        const existingRole = await Role.findOne({
-            $or: [
-                { name: name },
-                { qCode: qCode }
-            ]
+            select: '_id name description'
+        })
+        .populate({
+            path: 'users',
+            select: '_id userName email firstName lastName'
         });
 
-        if (existingRole) {
-            return res.status(400).json({
-                message: existingRole.name === name 
-                    ? "A role with this name already exists" 
-                    : "A role with this QCode already exists"
-            });
-        }
+    res.json(roles);
+});
 
-        if (!Array.isArray(permissions)) {
-            return res.status(400).json({ message: 'Permissions must be an array' });
-        }
-        // Verify that all permissions exist
-        if (permissions && permissions.length > 0) {
-            const existingPermissions = await Permission.find({
-                _id: { $in: permissions }
-            });
+//@desc     Get single role
+//@route    GET api/roles/:id
+//@access   Private/Admin
+exports.getRoleById = asyncHandler(async (req, res) => {
+    const role = await Role.findById(req.params.id)
+        .populate({
+            path: 'permissions',
+            select: '_id name description'
+        })
+        .populate({
+            path: 'users',
+            select: '_id userName email firstName lastName'
+        });
 
-            if (existingPermissions.length !== permissions.length) {
-                return res.status(400).json({
-                    message: "One or more permissions do not exist"
-                });
-            }
-        }
-
-        const role = new Role({ name, description, permissions, qCode });
-        await role.save();
-        res.status(201).json({ message: "Role created successfully" });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    if (role) {
+        res.json(role);
+    } else {
+        res.status(404);
+        throw new Error('Role not found');
     }
-};
+});
 
-//@desc     Update role details
-//@route    PUT /api/roles/:id
-//@access   Private
-exports.updateRole = async (req, res) => {
-    try {
-        const updateFields = {};
+//@desc     Create a role
+//@route    POST api/roles
+//@access   Private/Admin
+exports.createRole = asyncHandler(async (req, res) => {
+    const { name, description, permissions, users } = req.body;
 
-        // Check if name is provided but empty
-        if (req.body.name !== undefined) {
-            if (!req.body.name.trim()) {
-                return res.status(400).json({ message: 'Role name cannot be empty' });
-            }
-            updateFields.name = req.body.name.trim();
-        }
+    // Validate required fields
+    if (!name || !name.trim()) {
+        res.status(400);
+        throw new Error('Role name is required');
+    }
 
-        // Check if qCode is provided but empty
-        if (req.body.qCode !== undefined) {
-            if (!req.body.qCode.trim()) {
-                return res.status(400).json({ message: 'Role qCode cannot be empty' });
-            }
-            updateFields.qCode = req.body.qCode.trim();
-        }
+    const roleExists = await Role.findOne({ name });
 
-        if (req.body.permissions && !Array.isArray(req.body.permissions)) {
-            return res.status(400).json({ message: 'Permissions must be an array' });
-        }
+    if (roleExists) {
+        res.status(400);
+        throw new Error('Role already exists');
+    }
 
-        // Check for duplicates only if name or qCode is being updated
-        if (updateFields.name || updateFields.qCode) {
-            const duplicateRole = await Role.findOne({
-                _id: { $ne: req.params.roleId },
-                $or: [
-                    { name: updateFields.name },
-                    { qCode: updateFields.qCode }
-                ]
+    // Create role without qCode
+    const role = await Role.create({
+        name: name.trim(),
+        description: description?.trim(),
+        users: users || [],
+        permissions: permissions || []
+    });
+
+    if (role) {
+        // Populate the created role
+        const populatedRole = await Role.findById(role._id)
+            .populate({
+                path: 'permissions',
+                select: '_id name description'
+            })
+            .populate({
+                path: 'users',
+                select: '_id userName email firstName lastName'
             });
 
-            if (duplicateRole) {
-                return res.status(400).json({
-                    message: duplicateRole.name === updateFields.name
-                        ? 'Role name already exists'
-                        : 'Role qCode already exists'
-                });
-            }
-        }
-
-        if (req.body.description) updateFields.description = req.body.description;
-        if (req.body.permissions) updateFields.permissions = req.body.permissions;
-
-        const role = await Role.findByIdAndUpdate(req.params.roleId, updateFields, { new: true, runValidators: true });
-        if (!role) {
-            return res.status(404).json({ message: 'Role not found' });
-        }
-        res.status(200).json({ message: 'Role updated successfully' });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(201).json(populatedRole);
+    } else {
+        res.status(400);
+        throw new Error('Invalid role data');
     }
-};
+});
+
+//@desc     Update a role
+//@route    PUT api/roles/:id
+//@access   Private/Admin
+exports.updateRole = asyncHandler(async (req, res) => {
+    const { name, description, permissions } = req.body;
+
+    const role = await Role.findById(req.params.id);
+
+    if (role) {
+        role.name = name || role.name;
+        role.description = description || role.description;
+        role.permissions = permissions || role.permissions;
+
+        const updatedRole = await role.save();
+
+        res.json(updatedRole);
+    } else {
+        res.status(404);
+        throw new Error('Role not found');
+    }
+});
 
 //@desc     Delete a role
-//@route    DELETE /api/roles/:roleId
-//@access   Private
-exports.deleteRole = async (req, res) => {
-    try {
-        // First find the role to check if it exists
-        const role = await Role.findById(req.params.roleId);
-        if (!role) {
-            return res.status(404).json({
-                message: 'Role not found'
-            });
+//@route    DELETE api/roles/:id
+//@access   Private/Admin
+exports.deleteRole = asyncHandler(async (req, res) => {
+    const role = await Role.findById(req.params.id);
+
+    if (role) {
+        // Check if role has any users
+        if (role.users && role.users.length > 0) {
+            res.status(400);
+            throw new Error('Cannot delete role with assigned users');
         }
 
-        // Check if role is assigned to any users
-        const userWithRole = await User.findOne({ role: req.params.roleId });
-        if (userWithRole) {
-            return res.status(400).json({ 
-                message: 'Cannot delete role as it is assigned to one or more users. Please remove it from all users first.' 
-            });
-        }
-
-        await Role.findByIdAndDelete(req.params.roleId);
-        res.json({ message: 'Role deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+        await role.deleteOne();
+        res.json({ message: 'Role removed' });
+    } else {
+        res.status(404);
+        throw new Error('Role not found');
     }
-};
+});
+
+//@desc     Add user to role
+//@route    POST api/roles/:id/users
+//@access   Private/Admin
+exports.addUserToRole = asyncHandler(async (req, res) => {
+    const { userId } = req.body;
+    const role = await Role.findById(req.params.id);
+
+    if (!role) {
+        res.status(404);
+        throw new Error('Role not found');
+    }
+
+    // Check if user exists
+    const user = await User.findById(userId);
+    if (!user) {
+        res.status(404);
+        throw new Error('User not found');
+    }
+
+    // Add user to role if not already present
+    if (!role.users.includes(userId)) {
+        role.users.push(userId);
+        await role.save();
+    }
+
+    // Update user's role
+    user.role = role._id;
+    await user.save();
+
+    res.json(role);
+});
+
+//@desc     Remove user from role
+//@route    DELETE api/roles/:id/users/:userId
+//@access   Private/Admin
+exports.removeUserFromRole = asyncHandler(async (req, res) => {
+    const role = await Role.findById(req.params.id);
+
+    if (!role) {
+        res.status(404);
+        throw new Error('Role not found');
+    }
+
+    // Remove user from role
+    role.users = role.users.filter(user => user.toString() !== req.params.userId);
+    await role.save();
+
+    // Update user's role to null
+    await User.findByIdAndUpdate(req.params.userId, { role: null });
+
+    res.json(role);
+});
 
 //@desc     Get permissions for a role
 //@route    GET /api/roles/:roleId/permissions

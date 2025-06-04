@@ -4,9 +4,9 @@ const { authorizePermission, protect } = require('../middlewares/authHandler.js'
 
 const router = express.Router();
 
-router.get("/", protect,authorizePermission('READ_PERMISSION'), getPermissions);
-router.post("/",protect, authorizePermission('CREATE_PERMISSION'),createPermission);
-router.put("/:permissionId", protect, authorizePermission('UPDATE_PERMISSION'),updatePermission);
-router.delete("/:permissionId", protect, authorizePermission('DELETE_PERMISSION'),deletePermission);
+router.get("/", protect, getPermissions);
+router.post("/",protect, createPermission);
+router.put("/:permissionId", protect,updatePermission);
+router.delete("/:permissionId", protect, deletePermission);
 
 module.exports = router;

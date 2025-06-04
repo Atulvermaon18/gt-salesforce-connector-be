@@ -16,12 +16,12 @@ router.post('assign-orgId', protect, authorizePermission('SETTINGS'), userContro
 router.get('/logs', protect, authorizePermission(['VIEW_SELF_AUDIT','VIEW_ALL_AUDIT']), userController.getLoginLogoutLogs);
 
 // admin APIs
-router.get('/', protect, authorizePermission('USER_MANAGEMENT'), userController.getUsers);
-router.get('/:userId', protect, authorizePermission('USER_MANAGEMENT'), userController.getUserById);
-router.put('/update-status', protect, authorizePermission('USER_MANAGEMENT'), userController.toggleUserStatus);
-router.put('/profile', protect, authorizePermission('UPDATE_PROFILE'), userController.updateProfile);
-router.put('/:userId', protect, authorizePermission('USER_MANAGEMENT'), userController.updateUserById);
-router.post('/assign-role', protect, authorizePermission('USER_MANAGEMENT'), userController.assignRole);
-router.delete('/deactivate', protect, authorizePermission('DEACTIVATE_ACCOUNT'), userController.deactivateAccount);
+router.get('/', protect,  userController.getUsers);
+router.get('/:userId', protect,  userController.getUserById);
+router.put('/update-status', protect,  userController.toggleUserStatus);
+router.put('/profile', protect, userController.updateProfile);
+router.put('/:userId', protect,  userController.updateUserById);
+router.post('/assign-role', protect,  userController.assignRole);
+router.delete('/deactivate', protect, userController.deactivateAccount);
 
 module.exports = router;

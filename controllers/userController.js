@@ -16,13 +16,14 @@ const SalesforceOrg = require('../models/salesforceOrgModel.js');
 exports.login = asyncHandler(async (req, res) => {
   try {
     const { email, password } = req.body;
+    
     const user = await User.findOne({ email })
       .populate({
         path: 'role',
-        select: '_id name qCode',
+        select: '_id name description',
         populate: {
           path: 'permissions',
-          select: '_id name qCode'
+          select: '_id name description'
         }
       })
       .populate({
@@ -61,19 +62,17 @@ exports.login = asyncHandler(async (req, res) => {
         })
       ]);
 
-      // Process roles
-      const role = user.role.map(role => ({
-        _id: role._id,
-        name: role.name,
-        description: role.description,
-        qCode: role.qCode,
-        permissions: role.permissions.map(permission => ({
+      // Process role
+      const role = user.role ? {
+        _id: user.role._id,
+        name: user.role.name,
+        description: user.role.description,
+        permissions: user.role.permissions.map(permission => ({
           _id: permission._id,
           name: permission.name,
-          description: permission.description,
-          qCode: permission.qCode
+          description: permission.description
         }))
-      }));
+      } : null;
 
       // Set refresh token in HTTP-only cookie
       res.cookie('refreshToken', refreshToken, {
@@ -98,7 +97,7 @@ exports.login = asyncHandler(async (req, res) => {
       });
     } else {
       return res.status(400).json({
-        message: user.password ? user ? "Invalid Password" : "Invalid email" : "Check your email to set your password"
+        message: user.password ? "Invalid Password" : "Check your email to set your password"
       });
     }
   } catch (error) {
@@ -325,14 +324,6 @@ exports.refreshToken = asyncHandler(async (req, res) => {
 
       // Get user data
       const user = await User.findById(decoded.id)
-        .populate({
-          path: 'role',
-          select: '_id name description qCode',
-          populate: {
-            path: 'permissions',
-            select: '_id name description qCode'
-          }
-        });
 
       if (!user || !user.isActive) {
         throw new Error('User not found or inactive');
@@ -352,21 +343,11 @@ exports.refreshToken = asyncHandler(async (req, res) => {
         phoneNumber: user.phoneNumber,
         email: user.email,
         isActive: user.isActive,
-        role: user?.role?.map(role => ({
-          _id: role._id,
-          name: role.name,
-          description: role.description,
-          qCode: role.qCode,
-          permissions: role?.permissions?.map(permission => ({
-            _id: permission._id,
-            name: permission.name,
-            description: permission.description,
-            qCode: permission.qCode
-          }))
-        }))
+        role: user?.role
       });
 
     } catch (error) {
+      console.log(error);
       // Token verification failed - remove session and cookie
       session.refreshToken = ""; // Clear the refresh token in the session
       session.updatedAt = Date.now();
@@ -394,7 +375,6 @@ exports.getUsers = asyncHandler(async (req, res) => {
     const search = req.query.search || '';
     const sortField = req.query.sortField || 'createdAt'; // Default sort field
     const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1; // Default to descending
-    const roleId = req.query.roleId;
     const isActive = req.query.isActive;
 
     // Build search filter
@@ -408,11 +388,6 @@ exports.getUsers = asyncHandler(async (req, res) => {
       ]
     };
 
-    // Add role filter if provided
-    if (roleId) {
-      searchFilter.role = { $in: [roleId] };
-    }
-
     // Add isActive filter if provided
     if (isActive !== undefined && isActive !== null) {
       searchFilter.isActive = isActive === 'true';
@@ -421,140 +396,52 @@ exports.getUsers = asyncHandler(async (req, res) => {
     // Get total count for pagination
     const total = await User.countDocuments(searchFilter);
 
-    // Check if sorting by role name
-    if (sortField === 'role.name') {
-      const aggregationPipeline = [
-        { $match: searchFilter },
-        {
-          $lookup: {
-            from: 'roles',
-            localField: 'role',
-            foreignField: '_id',
-            as: 'roleData'
-          }
-        },
-        {
-          $addFields: {
-            roleName: { $arrayElemAt: ['$roleData.name', 0] }
-          }
-        },
-        { $sort: { roleName: sortOrder } },
-        { $skip: (page - 1) * limit },
-        { $limit: limit },
-        {
-          $project: {
-            password: 0,
-            temporaryPassword: 0,
-            roleData: 0
-          }
-        }
-      ];
-
-      const users = await User.aggregate(aggregationPipeline);
-
-      // Populate role data for the response
-      const populatedUsers = await User.populate(users, {
+    // Regular sorting for fields directly on the user document
+    const users = await User.find(searchFilter)
+      .select('-password -temporaryPassword')
+      .populate({
         path: 'role',
-        select: '_id name description qCode'
-      });
-
-      if (!populatedUsers.length) {
-        return res.json({
-          users: populatedUsers,
-          pagination: {
-            total,
-            page,
-            pages: Math.ceil(total / limit),
-            limit
-          }
-        });
-      }
-
-      const formattedUsers = populatedUsers.map(user => ({
-        _id: user._id,
-        profileImage: user.profileImage,
-        userName: user.userName,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        isActive: user.isActive,
-        role: user?.role?.map(role => ({
-          _id: role._id,
-          name: role.name,
-          description: role.description,
-          qCode: role.qCode
-        }))
-      }));
-
-      // Send response with pagination info
-      return res.json({
-        users: formattedUsers,
-        pagination: {
-          total,
-          page,
-          pages: Math.ceil(total / limit),
-          limit
+        select: '_id name description',
+        populate: {
+          path: 'permissions',
+          select: '_id name description'
         }
-      });
-    } else {
-      // Regular sorting for fields directly on the user document
-      const users = await User.find(searchFilter)
-        .select('-password -temporaryPassword')
-        .populate({
-          path: 'role',
-          select: '_id name description qCode'
-        })
-        .sort({ [sortField]: sortOrder })
-        .skip((page - 1) * limit)
-        .limit(limit);
+      })
+      .sort({ [sortField]: sortOrder })
+      .skip((page - 1) * limit)
+      .limit(limit);
 
-      if (!users.length) {
-        return res.json({
-          users: users,
-          pagination: {
-            total,
-            page,
-            pages: Math.ceil(total / limit),
-            limit
-          }
-        });
-      }
-
-      const formattedUsers = users.map(user => ({
-        _id: user._id,
-        profileImage: user.profileImage,
-        userName: user.userName,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        isActive: user.isActive,
-        role: user?.role?.map(role => ({
-          _id: role._id,
-          name: role.name,
-          description: role.description,
-          qCode: role.qCode,
-          permissions: role?.permissions?.map(permission => ({
-            _id: permission._id,
-            name: permission.name,
-            description: permission.description,
-            qCode: permission.qCode
-          }))
+    const formattedUsers = users.map(user => ({
+      _id: user._id,
+      profileImage: user.profileImage,
+      userName: user.userName,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      isActive: user.isActive,
+      role: user.role ? {
+        _id: user.role._id,
+        name: user.role.name,
+        description: user.role.description,
+        permissions: user.role.permissions.map(permission => ({
+          _id: permission._id,
+          name: permission.name,
+          description: permission.description
         }))
-      }));
+      } : null
+    }));
 
-      // Send response with pagination info
-      return res.json({
-        users: formattedUsers,
-        pagination: {
-          total,
-          page,
-          pages: Math.ceil(total / limit),
-          limit
-        }
-      });
-    }
+    // Send response with pagination info
+    return res.json({
+      users: formattedUsers,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -639,7 +526,7 @@ exports.updateUserById = asyncHandler(async (req, res) => {
     // Check for restricted fields
     if (req.body.password || req.body.email) {
       return res.status(400).json({
-        message: "Cannot update password, email, or role"
+        message: "Cannot update password or email"
       });
     }
 
@@ -649,7 +536,15 @@ exports.updateUserById = asyncHandler(async (req, res) => {
     user.firstName = req.body?.firstName || user.firstName;
     user.lastName = req.body?.lastName || user.lastName;
     user.phoneNumber = req.body?.phoneNumber || user.phoneNumber;
-    user.role = req.body?.role || user.role;
+    
+    // Handle role update - take the first role if array is provided
+    if (req.body?.role) {
+      if (Array.isArray(req.body.role)) {
+        user.role = req.body.role[0]; // Take the first role from the array
+      } else {
+        user.role = req.body.role;
+      }
+    }
 
     const updatedUser = await user.save();
 
@@ -658,10 +553,10 @@ exports.updateUserById = asyncHandler(async (req, res) => {
       .select('-password -temporaryPassword')
       .populate({
         path: 'role',
-        select: '_id name description qCode',
+        select: '_id name description',
         populate: {
           path: 'permissions',
-          select: '_id name description qCode'
+          select: '_id name description'
         }
       });
 
@@ -673,18 +568,16 @@ exports.updateUserById = asyncHandler(async (req, res) => {
       lastName: populatedUser.lastName,
       email: populatedUser.email,
       phoneNumber: populatedUser.phoneNumber,
-      role: populatedUser?.role?.map(role => ({
-        _id: role._id,
-        name: role.name,
-        description: role.description,
-        qCode: role.qCode,
-        permissions: role?.permissions?.map(permission => ({
+      role: populatedUser.role ? {
+        _id: populatedUser.role._id,
+        name: populatedUser.role.name,
+        description: populatedUser.role.description,
+        permissions: populatedUser.role.permissions.map(permission => ({
           _id: permission._id,
           name: permission.name,
-          description: permission.description,
-          qCode: permission.qCode
+          description: permission.description
         }))
-      })),
+      } : null,
       message: "User updated successfully"
     });
   } catch (error) {

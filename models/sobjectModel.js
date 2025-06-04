@@ -16,11 +16,7 @@ const fieldSchema = new mongoose.Schema({
   precision: Number,
   scale: Number,
   custom: Boolean,
-  permissionId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Permission',
-    default: null
-  },
+  permissionId: String,
   metadata: {
     type: String,
     default: '{}'
@@ -39,11 +35,7 @@ const sobjectSchema = new mongoose.Schema({
   },
   keyPrefix: String,
   labelPlural: String,
-  permissionId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Permission',
-    default: null
-  },
+  permissionId: String,
   fields: [fieldSchema],
   metadata: {
     type: String,
