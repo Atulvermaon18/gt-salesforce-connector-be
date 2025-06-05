@@ -5,7 +5,7 @@ const morgan = require('morgan');
 const connectDb = require('./db.js');
 const cors = require('cors');
 const userRoutes = require('./routes/userRoutes.js');
-const roleRoutes = require('./routes/roleRoutes.js');
+const groupRoutes = require('./routes/roleRoutes.js');
 const permissionRoutes = require('./routes/permissionRoutes.js');
 const salesforceRoutes = require('./routes/salesforceRoutes.js');
 const sobjectRoutes = require('./routes/sobjectRoutes.js');
@@ -56,7 +56,7 @@ process.env.EMAIL_PROVIDER !== 'gmail' ? setupOAuthRoutes(app) : null;
 
 // Routes
 app.use('/api/users', userRoutes);
-app.use("/api/roles", roleRoutes);
+app.use("/api/groups", groupRoutes);
 app.use("/api/permissions", permissionRoutes);
 app.use("/api/salesforce", salesforceRoutes);
 app.use("/api/sobjects", sobjectRoutes);
