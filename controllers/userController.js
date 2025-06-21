@@ -18,21 +18,13 @@ exports.login = asyncHandler(async (req, res) => {
     const { email, password } = req.body;
     
     const user = await User.findOne({ email })
-      .populate({
-        path: 'role',
-        select: '_id name description',
-        populate: {
-          path: 'permissions',
-          select: '_id name description'
-        }
-      })
-      .populate({
-        path: 'orgIds',
-        select: '_id environment status orgId'
-      }).populate({
-        path: 'companyId',
-        select: '_id name'
-      });
+      // .populate({
+      //   path: 'orgIds',
+      //   select: '_id environment status orgId'
+      // }).populate({
+      //   path: 'companyId',
+      //   select: '_id name'
+      // });
 
     // Check if user exists and is active
     if (!user || !user.isActive) {
@@ -67,11 +59,11 @@ exports.login = asyncHandler(async (req, res) => {
         _id: user.role._id,
         name: user.role.name,
         description: user.role.description,
-        permissions: user.role.permissions.map(permission => ({
-          _id: permission._id,
-          name: permission.name,
-          description: permission.description
-        }))
+        // permissions: user.role.permissions.map(permission => ({
+        //   _id: permission._id,
+        //   name: permission.name,
+        //   description: permission.description
+        // }))
       } : null;
 
       // Set refresh token in HTTP-only cookie
@@ -424,11 +416,11 @@ exports.getUsers = asyncHandler(async (req, res) => {
         _id: user.role._id,
         name: user.role.name,
         description: user.role.description,
-        permissions: user.role.permissions.map(permission => ({
-          _id: permission._id,
-          name: permission.name,
-          description: permission.description
-        }))
+        // permissions: user.role.permissions.map(permission => ({
+        //   _id: permission._id,
+        //   name: permission.name,
+        //   description: permission.description
+        // }))
       } : null
     }));
 
@@ -485,18 +477,18 @@ exports.getUserById = asyncHandler(async (req, res) => {
       email: user.email,
       phoneNumber: user.phoneNumber,
       isActive: user.isActive,
-      role: user.role.map(role => ({
-        _id: role._id,
-        name: role.name,
-        description: role.description,
-        qCode: role.qCode,
-        permissions: role?.permissions?.map(permission => ({
-          _id: permission._id,
-          name: permission.name,
-          description: permission.description,
-          qCode: permission.qCode
-        }))
-      }))
+      // role: user.role.map(role => ({
+        // _id: role._id,
+        // name: role.name,
+        // description: role.description,
+        // qCode: role.qCode,
+        // permissions: role?.permissions?.map(permission => ({
+        //   _id: permission._id,
+        //   name: permission.name,
+        //   description: permission.description,
+        //   qCode: permission.qCode
+        // }))
+      // }))
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
