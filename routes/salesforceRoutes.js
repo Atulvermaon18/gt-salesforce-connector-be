@@ -13,16 +13,16 @@ const { getSalesforceApps, getSalesforceAppById } = require('../controllers/sale
 
 const router = express.Router();
 
-router.get("/auth-url", protect, authorizePermission("SETTINGS"), generateAuthUrl);
-router.post("/exchangeAuthCode", protect, authorizePermission("SETTINGS"), exchangeAuthCode);
-router.get("/connection-status", protect, authorizePermission("SETTINGS"), getConnectionStatus);
-router.get("/objectList", protect, authorizePermission("SETTINGS"), salesforceGetObjectByOrgId);
-router.get("/objectCount", protect, authorizePermission("SETTINGS"), salesforceGetObjectCount);
-router.get("/retriveOrg", protect, authorizePermission("SETTINGS"), getOrgConnections);
-router.get("/describe", protect, authorizePermission("SETTINGS"), salesforceDescribe);
-router.post("/createObject", protect, authorizePermission("SETTINGS"), salesforceCreateObjectByOrgId);
-router.get("/getObjectById", protect, authorizePermission("SETTINGS"), salesforceGetObjectById);
-router.get("/getSalesforceApps", protect, authorizePermission("SETTINGS"), getSalesforceApps);
-router.get("/getSalesforceAppById", protect, authorizePermission("SETTINGS"), getSalesforceAppById);
+router.get("/auth-url",   generateAuthUrl);
+router.post("/exchangeAuthCode",   exchangeAuthCode);
+router.get("/connection-status",   getConnectionStatus);
+router.get("/objectList",   salesforceGetObjectByOrgId);
+router.get("/objectCount",   salesforceGetObjectCount);
+router.get("/retriveOrg",   getOrgConnections);
+router.get("/describe",   salesforceDescribe);
+router.post("/createObject",  salesforceCreateObjectByOrgId);
+router.get("/getObjectById",  salesforceGetObjectById);
+router.get("/getSalesforceApps",  getSalesforceApps);
+router.get("/getSalesforceAppById",  getSalesforceAppById);
 
 module.exports = router;

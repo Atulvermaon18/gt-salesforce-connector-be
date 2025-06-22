@@ -6,7 +6,7 @@ const Role = require('../models/roleModel.js');
 //@access   Public
 exports.getPermissions = async (req, res) => {
     try {
-        const permissions = await Permission.find().select('_id name description qCode');
+        const permissions = await Permission.find().select('_id name description qCode sobject');
         res.json(permissions);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -24,9 +24,9 @@ exports.createPermission = async (req, res) => {
         }
 
         // Check if qCode is empty
-        if (!req.body.qCode || !req.body.qCode.trim()) {
-            return res.status(400).json({ message: 'Permission  cannot be empty' });
-        }
+        // if (!req.body.qCode || !req.body.qCode.trim()) {
+        //     return res.status(400).json({ message: 'Permission  cannot be empty' });
+        // }
 
         // Check if permission with same name or qCode already exists
         const existingPermission = await Permission.findOne({
@@ -35,18 +35,20 @@ exports.createPermission = async (req, res) => {
             ]
         });
 
-        if (existingPermission) {
-            return res.status(400).json({
-                message: existingPermission.name === req.body.name.trim()
-                    ? 'Permission name already exists'
-                    : 'Permission qCode already exists'
-            });
-        }
+        // if (existingPermission) {
+        //     return res.status(400).json({
+        //         message: existingPermission.name === req.body.name.trim()
+        //             ? 'Permission name already exists'
+        //             : 'Permission qCode already exists'
+        //     });
+        // }
 
         const permission = new Permission({
             name: req.body.name.trim(),
-            description: req.body.description,
-            qCode: req.body.qCode.trim()
+            description: req.body.description, 
+            // qCode: req.body.qCode.trim(),
+            sobject: req.body.sobject,
+            
         });
         await permission.save();
         res.status(201).json({ message: 'Permission created successfully' });
@@ -72,6 +74,10 @@ exports.updatePermission = async (req, res) => {
 
         if (req.body.description) {
             updateFields.description = req.body.description;
+        }
+
+        if (req.body.sobject) {
+            updateFields.sobject = req.body.sobject;
         }
 
         // Check if permission exists
