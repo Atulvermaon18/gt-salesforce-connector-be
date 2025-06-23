@@ -93,7 +93,7 @@ exports.createRole = asyncHandler(async (req, res) => {
 //@route    PUT api/roles/:id
 //@access   Private/Admin
 exports.updateRole = asyncHandler(async (req, res) => {
-    const { name, description, permissions } = req.body;
+    const { name, description, permissions,users } = req.body;
 
     const role = await Role.findById(req.params.id);
 
@@ -101,7 +101,7 @@ exports.updateRole = asyncHandler(async (req, res) => {
         role.name = name || role.name;
         role.description = description || role.description;
         role.permissions = permissions || role.permissions;
-
+        role.users = users || role.users;
         const updatedRole = await role.save();
 
         res.json(updatedRole);
