@@ -62,7 +62,7 @@ const userSchemaDefinition = {
     ref: 'Company',
   },
   orgIds: [{
-    type: mongoose.Schema.Types.ObjectId, 
+    type: String,
     ref: 'SalesforceOrg',
   }], 
 }

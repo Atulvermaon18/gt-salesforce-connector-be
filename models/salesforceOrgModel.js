@@ -8,7 +8,7 @@ const salesforceOrgSchema = withBaseSchema({
     },
     refreshToken: {
       type: String,
-      required: true,
+      // required: true,
     },
     idtoken:{
         type: String,

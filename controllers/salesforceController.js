@@ -48,7 +48,6 @@ exports.getConnectionStatus = asyncHandler(async (req, res) => {
 exports.generateAuthUrl = asyncHandler(async (req, res) => {
   try {
     const { environment, rootOrgName } = req.query;
-
     const clientId = process.env.SALESFORCE_CLIENT_ID;
     const redirectUri = process.env.SALESFORCE_CALLBACK_URL;
 
@@ -98,7 +97,7 @@ exports.generateAuthUrl = asyncHandler(async (req, res) => {
 //@access   Public
 exports.exchangeAuthCode = asyncHandler(async (req, res) => {
   try {
-    const { authCode, environment, rootOrgName } = req.body;
+    const { authCode, environment, rootOrgName,id } = req.body;
 
     let baseURL = "";
 
@@ -127,7 +126,7 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
       orgId: tokenData.id.split('/')[4], // Extract orgId from the ID URL
       companyId: company._id,
       accessToken: tokenData.access_token,
-      refreshToken: tokenData.refresh_token,
+      refreshToken: tokenData.refresh_token || '',
       idtoken: tokenData.id_token,
       instanceUrl: tokenData.instance_url,
       issuedAt: new Date(parseInt(tokenData.issued_at)),
@@ -149,7 +148,7 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
     // const orgDetails = await salesforceApiRequest(config, tokenData);
 
     // Associate the user with the company and org ID
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -157,8 +156,8 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
     // Link the user to the company
     user.companyId = company._id;
     // Add the org ID to the user's orgIds array if not already present
-    if (!user.orgIds.includes(savedSalesforceOrg._id)) {
-      user.orgIds.push(savedSalesforceOrg._id);
+    if (!user?.orgIds?.includes(savedSalesforceOrg.orgId)) {
+      user.orgIds.push(savedSalesforceOrg.orgId);
     }
     await user.save();
     return res.json({
