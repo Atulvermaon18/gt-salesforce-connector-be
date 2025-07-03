@@ -97,7 +97,7 @@ exports.generateAuthUrl = asyncHandler(async (req, res) => {
 //@access   Public
 exports.exchangeAuthCode = asyncHandler(async (req, res) => {
   try {
-    const { authCode, environment, rootOrgName,id } = req.body;
+    const { authCode, environment, rootOrgName, id } = req.body;
 
     let baseURL = "";
 
@@ -190,20 +190,20 @@ exports.salesforceGetObjectByOrgId = asyncHandler(async (req, res) => {
 
     // Get user permissions
     const userPermissions = extractUserPermissions(req.user);
-    
+
     // Get the sObject from our database to check field permissions
     const SObject = require('../models/sobjectModel');
     const sobject = await SObject.findOne({ name: objectApiName });
-    
+
     // Determine which fields the user can access
     let fieldsClause = 'FIELDS(ALL)';
     if (sobject && sobject.fields && sobject.fields.length > 0) {
       // Filter fields based on permissions
-      const accessibleFields = sobject.fields.filter(field => 
+      const accessibleFields = sobject.fields.filter(field =>
         // Only include fields that the user has permission to access
         field.permissionId && userPermissions.includes(field.permissionId.toString())
       );
-      
+
       if (accessibleFields.length > 0) {
         // Use only accessible fields in the query
         fieldsClause = accessibleFields.map(field => field.name).join(',');
@@ -317,7 +317,7 @@ exports.salesforceCreateObjectByOrgId = asyncHandler(async (req, res) => {
 //@access   Private
 exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
   try {
-    const { orgId, objectApiName, objectId } = req.query; 
+    const { orgId, objectApiName, objectId } = req.query;
 
     // Fetch the Salesforce token for the orgId
     const token = await SalesforceToken.findOne({ orgId }).sort({ updatedAt: -1 });
@@ -327,20 +327,20 @@ exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
 
     // Get user permissions
     const userPermissions = extractUserPermissions(req.user);
-    
+
     // Get the sObject from our database to check field permissions
     const SObject = require('../models/sobjectModel');
     const sobject = await SObject.findOne({ name: objectApiName });
-    
+
     // Determine which fields the user can access
     let fieldList = '*';
     if (sobject && sobject.fields && sobject.fields.length > 0) {
       // Filter fields based on permissions
-      const accessibleFields = sobject.fields.filter(field => 
+      const accessibleFields = sobject.fields.filter(field =>
         // Only include fields that the user has permission to access
         field.permissionId && userPermissions.includes(field.permissionId.toString())
       );
-      
+
       if (accessibleFields.length > 0) {
         // Use only accessible fields in the query
         fieldList = accessibleFields.map(field => field.name).join(',');
@@ -355,7 +355,7 @@ exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
       method: 'get',
       url: `${token.instanceUrl}/services/data/v57.0/sobjects/${objectApiName}/${objectId}?fields=${fieldList}`,
     };
-    
+
     const dataObject = await salesforceApiRequest(config, token);
     if (dataObject.newAccessToken) {
       token.accessToken = dataObject.newAccessToken;
@@ -373,7 +373,7 @@ exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
 // Helper function to extract user permissions
 function extractUserPermissions(user) {
   if (!user || !user.role) return [];
-  
+
   const permissions = [];
   if (Array.isArray(user.role)) {
     user.role.forEach(role => {
@@ -384,7 +384,7 @@ function extractUserPermissions(user) {
       }
     });
   }
-  
+
   return permissions;
 }
 
@@ -498,13 +498,13 @@ exports.getSalesforceAppById = asyncHandler(async (req, res) => {
       },
     };
     const response = await axios(axiosConfig);
-    
+
     // Get the app data
     const appData = response.data;
-    
+
     // Get user from request
     const user = req.user;
-    
+
     // If there are navigation items and the user isn't an admin, filter them
     if (appData.navItems && appData.navItems.length > 0 && user && !user.isAdmin) {
       // Extract user permissions from the roles
@@ -518,15 +518,15 @@ exports.getSalesforceAppById = asyncHandler(async (req, res) => {
           }
         });
       }
-      
+
       // Filter navItems based on object permissions
       const filteredNavItems = [];
-      
+
       for (const navItem of appData.navItems) {
         if (navItem.objectApiName) {
           // Look up the object in our database
           const sobject = await SObject.findOne({ name: navItem.objectApiName });
-          
+
           // Only include if object exists in DB and user has required permission
           if (sobject && sobject.permissionId && userPermissions.includes(sobject.permissionId.toString())) {
             filteredNavItems.push(navItem);
@@ -536,11 +536,11 @@ exports.getSalesforceAppById = asyncHandler(async (req, res) => {
           filteredNavItems.push(navItem);
         }
       }
-      
+
       // Replace the nav items with the filtered list
       appData.navItems = filteredNavItems;
     }
-    
+
     res.status(200).json(appData);
   } catch (error) {
     console.error('Error fetching Salesforce app:', error.message);
@@ -548,5 +548,35 @@ exports.getSalesforceAppById = asyncHandler(async (req, res) => {
   }
 });
 
-
+//@desc     Get contacts from Salesforce
+//@route    GET /api/salesforce/getContacts
+//@access   Private
+exports.getContacts = asyncHandler(async (req, res) => {
+  try {
+    const { orgId } = req.query;
+    if (!orgId) {
+      return res.status(400).json({ message: 'orgId is required' });
+    }
+    const org = await SalesforceToken.findOne({ orgId });
+    if (!org) {
+      return res.status(404).json({ message: 'Salesforce org not found' });
+    }
+    const url = `${org.instanceUrl}/services/data/v59.0/sobjects/Contact`;
+    const axiosConfig = {
+      method: 'get',
+      url,
+      headers: {
+        Authorization: `Bearer ${org.accessToken}`,
+        "Content-Type": "application/json",
+      },
+    };
+    const response = await axios(axiosConfig);
+    const data = response.data.recentItems || [];
+    console.log(response);
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('Error fetching Salesforce contacts:', error.message);
+    res.status(500).json({ message: 'Error fetching Salesforce contacts', error: error.message });
+  }
+})
 

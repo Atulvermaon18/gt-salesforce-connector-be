@@ -9,7 +9,7 @@ const { exchangeAuthCode,
     salesforceGetObjectById,
     salesforceCreateObjectByOrgId } = require("../controllers/salesforceController.js");
 const { authorizePermission, protect } = require('../middlewares/authHandler.js');
-const { getSalesforceApps, getSalesforceAppById } = require('../controllers/salesforceController.js');
+const { getSalesforceApps, getSalesforceAppById, getContacts } = require('../controllers/salesforceController.js');
 
 const router = express.Router();
 
@@ -24,5 +24,6 @@ router.post("/createObject",  salesforceCreateObjectByOrgId);
 router.get("/getObjectById",  salesforceGetObjectById);
 router.get("/getSalesforceApps",  getSalesforceApps);
 router.get("/getSalesforceAppById",  getSalesforceAppById);
+router.get("/getContacts",  getContacts);
 
 module.exports = router;
