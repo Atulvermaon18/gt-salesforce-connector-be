@@ -1,7 +1,7 @@
 const axios = require('axios');
 const SalesforceToken = require('../models/salesforceOrgModel.js');
 const asyncHandler = require('express-async-handler');
-const { exchangeAuthCodeForToken, salesforceApiRequest } = require('../salesforceServices/tokenServices.js');
+const { exchangeAuthCodeForToken, salesforceApiRequest,n8nSalesforceApiRequest } = require('../salesforceServices/tokenServices.js');
 const Company = require('../models/companyModel');
 const SalesforceOrg = require('../models/salesforceOrgModel');
 const User = require('../models/userModel.js');
@@ -199,10 +199,11 @@ exports.salesforceGetObjectByOrgId = asyncHandler(async (req, res) => {
     let fieldsClause = 'FIELDS(ALL)';
     if (sobject && sobject.fields && sobject.fields.length > 0) {
       // Filter fields based on permissions
-      const accessibleFields = sobject.fields.filter(field =>
-        // Only include fields that the user has permission to access
-        field.permissionId && userPermissions.includes(field.permissionId.toString())
-      );
+      const accessibleFields = sobject.fields
+      // .filter(field =>
+      //   // Only include fields that the user has permission to access
+      //   field.permissionId && userPermissions.includes(field.permissionId.toString())
+      // );
 
       if (accessibleFields.length > 0) {
         // Use only accessible fields in the query
@@ -211,25 +212,20 @@ exports.salesforceGetObjectByOrgId = asyncHandler(async (req, res) => {
         // If no fields are accessible, return empty array
         return res.json([]);
       }
-      fieldsClause = 'Id,' + fieldsClause
+      // fieldsClause = 'Id,' + fieldsClause
     }
-
-    try {
-      // Query to fetch objects with permitted fields only
-      const query = `SELECT ${fieldsClause} FROM ${objectApiName} ORDER BY ${sortField || 'Id'} ${sortDirection || 'ASC'} LIMIT ${limit || 100} OFFSET ${((page || 1) - 1) * (limit || 100)}`;
-      const config = {
-        method: 'get',
-        url: `${org.instanceUrl}/services/data/v56.0/query`,
-        params: { q: query },
-      };
-
-      // Fetch objects from Salesforce
-      const objects = await salesforceApiRequest(config, org);
-      return res.json(objects.records);
-    } catch (error) {
-      console.error(`Error fetching objects for orgId:`, error.message);
-      return res.status(500).json({ message: "Error fetching Salesforce objects" });
-    }
+    const query = `SELECT ${fieldsClause} FROM ${objectApiName} ORDER BY ${sortField || 'Id'} ${sortDirection || 'ASC'} LIMIT ${limit || 100} OFFSET ${((page || 1) - 1) * (limit || 100)}`;
+    
+    const apiResponse = await n8nSalesforceApiRequest({
+      method: 'post',
+      url: process.env.N8N_URL,
+      endpoint:"query",
+      data: { query: query ,
+         endpoint:"query"
+      },
+    });
+    return res.json(apiResponse);
+  
   } catch (error) {
     console.error("Error fetching Salesforce objects:", error.message);
     res.status(500).json({ message: "Error fetching Salesforce objects" });
@@ -336,10 +332,11 @@ exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
     let fieldList = '*';
     if (sobject && sobject.fields && sobject.fields.length > 0) {
       // Filter fields based on permissions
-      const accessibleFields = sobject.fields.filter(field =>
-        // Only include fields that the user has permission to access
-        field.permissionId && userPermissions.includes(field.permissionId.toString())
-      );
+      const accessibleFields = sobject.fields
+      // .filter(field =>
+      //   // Only include fields that the user has permission to access
+      //   field.permissionId && userPermissions.includes(field.permissionId.toString())
+      // );
 
       if (accessibleFields.length > 0) {
         // Use only accessible fields in the query
@@ -348,22 +345,19 @@ exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
         // If no fields are accessible, return empty record
         return res.json({});
       }
-      fieldList = 'Id,' + fieldList
+      // fieldList = 'Id,' + fieldList
     }
-
-    const config = {
-      method: 'get',
-      url: `${token.instanceUrl}/services/data/v57.0/sobjects/${objectApiName}/${objectId}?fields=${fieldList}`,
-    };
-
-    const dataObject = await salesforceApiRequest(config, token);
-    if (dataObject.newAccessToken) {
-      token.accessToken = dataObject.newAccessToken;
-      token.refreshToken = dataObject.newRefreshToken;
-      token.idToken = dataObject.newIdToken;
-    }
-
-    return res.json(dataObject);
+    const query = `SELECT ${fieldList} FROM ${objectApiName} WHERE Id = '${objectId}'`;
+    // console.log(query);
+    const apiResponse = await n8nSalesforceApiRequest({
+      method: 'post',
+      url: process.env.N8N_URL,
+      data: { query: query, 
+         endpoint:"query"
+      },
+    });
+    return res.json(apiResponse);
+ 
   } catch (error) {
     console.error("Error retrieving Salesforce object:", error.message);
     return res.status(500).json({ message: "Error retrieving Salesforce object" });
@@ -461,15 +455,23 @@ exports.getSalesforceApps = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Salesforce org not found' });
     }
     const url = `${org.instanceUrl}/services/data/v57.0/ui-api/apps?formFactor=Large`;
+    payload = {
+      "url":url,
+      "method": "GET",
+      "body": {},
+      "endpoint":"record"
+    }
     const axiosConfig = {
-      method: 'get',
-      url,
+      method: 'post',
+      url: process.env.N8N_URL,
       headers: {
-        Authorization: `Bearer ${org.accessToken}`,
+        'Content-Type': 'application/json',
       },
+   data: payload
     };
-    const response = await axios(axiosConfig);
-    res.status(200).json(response.data);
+    const response = await n8nSalesforceApiRequest(axiosConfig);
+   
+    res.status(200).json(response[0]);
   } catch (error) {
     console.error('Error fetching Salesforce apps:', error.message);
     res.status(500).json({ message: 'Error fetching Salesforce apps', error: error.message });
@@ -490,17 +492,24 @@ exports.getSalesforceAppById = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Salesforce org not found' });
     }
     const url = `${org.instanceUrl}/services/data/v57.0/ui-api/apps/${appId}?formFactor=Large`;
+ 
+    payload = {
+      "url":url,
+      "method": "GET",
+      "endpoint":"record",
+      "body": {}
+    }
     const axiosConfig = {
-      method: 'get',
-      url,
+      method: 'post',
+      url: process.env.N8N_URL,
       headers: {
-        Authorization: `Bearer ${org.accessToken}`,
+        'Content-Type': 'application/json',
       },
+   data: payload
     };
-    const response = await axios(axiosConfig);
-
+    const response = await n8nSalesforceApiRequest(axiosConfig);
     // Get the app data
-    const appData = response.data;
+    const appData = response[0];
 
     // Get user from request
     const user = req.user;

@@ -3,7 +3,7 @@ const SObject = require('../models/sobjectModel');
 const Permission = require('../models/permissionModel');
 const axios = require('axios');
 const SalesforceToken = require('../models/salesforceOrgModel.js');
-const { exchangeAuthCodeForToken, salesforceApiRequest } = require('../salesforceServices/tokenServices.js');
+const { exchangeAuthCodeForToken, salesforceApiRequest,n8nSalesforceApiRequest } = require('../salesforceServices/tokenServices.js');
 
 // Get all sObjects - fetch from DB first, if empty then get from Salesforce API
 exports.getSObjects = async (req, res, next) => {
@@ -22,14 +22,24 @@ exports.getSObjects = async (req, res, next) => {
         return res.status(404).json({ message: 'Salesforce org not found' });
       }
 
-      const config = {
-        method: 'get',
-        url: `${org.instanceUrl}/services/data/v57.0/sobjects/`,
+      
+      payload = {
+        "url":`${org.instanceUrl}/services/data/v57.0/sobjects/`,
+        "method": "GET",
+        "body": {},
+        "endpoint":"record"
+      }
+      const axiosConfig = {
+        method: 'post',
+        url: process.env.N8N_URL,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+     data: payload
       };
-
-      const response = await salesforceApiRequest(config, org);
-
-      const sfObjects = response.sobjects || [];
+      const response = await n8nSalesforceApiRequest(axiosConfig);
+    console.log(response,'--------------------------->')
+      const sfObjects = response[0]?.sobjects || [];
       // Save the objects to the database
       const objectsToSave = sfObjects.filter(obj => {
         if (!obj.label.includes('MISSING LABEL')) {

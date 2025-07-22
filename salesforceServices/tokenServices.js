@@ -170,8 +170,21 @@ const salesforceApiRequest = async (config, token) => {
     }
 };
 
+const n8nSalesforceApiRequest = async (config) => {
+    try {
+      const response = await axios.request(config)
+      
+      return response.data;
+    } catch (error) {
+        console.error('Error making Salesforce API request:', error.response?.data || error.message);
+        throw new Error(
+            error.response?.data?.error_description || 'Failed to make Salesforce API request'
+        );
+    }
+}
 module.exports = {
     exchangeAuthCodeForToken,
     getNewTokens,
     salesforceApiRequest,
+    n8nSalesforceApiRequest
 };
