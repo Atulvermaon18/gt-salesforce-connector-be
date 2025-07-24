@@ -38,7 +38,7 @@ exports.getSObjects = async (req, res, next) => {
      data: payload
       };
       const response = await n8nSalesforceApiRequest(axiosConfig);
-    console.log(response,'--------------------------->')
+  
       const sfObjects = response[0]?.sobjects || [];
       // Save the objects to the database
       const objectsToSave = sfObjects.filter(obj => {

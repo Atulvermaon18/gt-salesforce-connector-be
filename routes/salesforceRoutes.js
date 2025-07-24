@@ -7,9 +7,9 @@ const { exchangeAuthCode,
     salesforceGetObjectCount,
     getOrgConnections,
     salesforceGetObjectById,
-    salesforceCreateObjectByOrgId } = require("../controllers/salesforceController.js");
+    salesforceCreateObjectByOrgId ,getRelatedObjects,getRelatedObjectRecords} = require("../controllers/salesforceController.js");
 const { authorizePermission, protect } = require('../middlewares/authHandler.js');
-const { getSalesforceApps, getSalesforceAppById, getContacts } = require('../controllers/salesforceController.js');
+const { getSalesforceApps, getSalesforceAppById } = require('../controllers/salesforceController.js');
 
 const router = express.Router();
 
@@ -23,7 +23,8 @@ router.get("/describe",   salesforceDescribe);
 router.post("/createObject",  salesforceCreateObjectByOrgId);
 router.get("/getObjectById",  salesforceGetObjectById);
 router.get("/getSalesforceApps",  getSalesforceApps);
-router.get("/getSalesforceAppById",  getSalesforceAppById);
-router.get("/getContacts",  getContacts);
+router.get("/getSalesforceAppById",  getSalesforceAppById); 
+router.get("/relatedObjects",  getRelatedObjects);
+router.get("/relatedObjectRecords",  getRelatedObjectRecords);
 
 module.exports = router;
