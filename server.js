@@ -17,6 +17,7 @@ const { notFound, errorHandler } = require('./middlewares/errorHandler.js');
 const cookieParser = require('cookie-parser');
 const { decryptRequest, encryptResponse } = require('./middlewares/encryptionMiddleware.js');
 const { setupOAuthRoutes } = require('./utils/setupOAuth.js');
+const userPreferenceRoutes = require('./routes/userPreferenceRoutes.js');
 
 dotenv.config();
 
@@ -60,6 +61,7 @@ app.use("/api/groups", groupRoutes);
 app.use("/api/permissions", permissionRoutes);
 app.use("/api/salesforce", salesforceRoutes);
 app.use("/api/sobjects", sobjectRoutes);
+app.use("/api/userPreference", userPreferenceRoutes);
 // app.use('/api',orgRoutes);
 
 app.get('/', (req, res) => {
