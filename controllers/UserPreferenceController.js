@@ -18,7 +18,7 @@ exports.getUserPreference = async (req, res) => {
 
     // Convert strings to ObjectId instances using the new syntax
     const objectIds = userPreferences[0].preferences.selectedSobjects.map(id => new mongoose.Types.ObjectId(id));
-    
+      
   
     // Query MongoDB
     const sobjects = await SObject.find({ _id: { $in: objectIds } });
