@@ -5,5 +5,6 @@ const router=express.Router()
 router.get('/',metadataControler.getMetadata)
 router.get('/:id',metadataControler.getMetadataById)
 router.post('/configuration',metadataControler.configMetadata)
+router.post('/process',metadataControler.processMetadata)
 
 module.exports=router

@@ -7,7 +7,7 @@ const { exchangeAuthCode,
     salesforceGetObjectCount,
     getOrgConnections,
     salesforceGetObjectById,
-    salesforceCreateObjectByOrgId ,getRelatedObjects,getRelatedObjectRecords} = require("../controllers/salesforceController.js");
+    salesforceCreateObjectByOrgId ,getRelatedObjects,getRelatedObjectRecords,objectFieldValues} = require("../controllers/salesforceController.js");
 const { authorizePermission, protect } = require('../middlewares/authHandler.js');
 const { getSalesforceApps, getSalesforceAppById } = require('../controllers/salesforceController.js');
 
@@ -26,5 +26,6 @@ router.get("/getSalesforceApps",  getSalesforceApps);
 router.get("/getSalesforceAppById",  getSalesforceAppById); 
 router.get("/relatedObjects",  getRelatedObjects);
 router.get("/relatedObjectRecords",  getRelatedObjectRecords);
+router.get("/objectFieldValues",   objectFieldValues);
 
 module.exports = router;

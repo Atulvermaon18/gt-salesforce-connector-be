@@ -635,9 +635,36 @@ exports.getRelatedObjectRecords = asyncHandler(async (req,res)=>{
    data: payload
     };
     const response = await n8nSalesforceApiRequest(axiosConfig);
-    console.log(response);
+ 
     
     res.status(200).json(response[0]);
+  } catch (error) {
+    console.error('Error fetching related objects:', error.message);
+    res.status(500).json({ message: 'Error fetching related objects', error: error.message });
+  }
+}); 
+
+exports.objectFieldValues = asyncHandler(async (req,res)=>{
+  try{
+    const { orgId, objectApiName ,fieldName} = req.query;
+    if(!orgId || !objectApiName || !fieldName) return res.status(400).json({ message: 'orgId and objectApiName and fieldName are required' });
+    const org=await SalesforceToken.findOne({ orgId });
+    if (!org) {
+      return res.status(404).json({ message: 'Salesforce org not found' });
+    }
+    const query = `SELECT ${fieldName} FROM ${objectApiName}`;
+    
+    const apiResponse = await n8nSalesforceApiRequest({
+      method: 'post',
+      url: process.env.N8N_URL,
+      endpoint:"query",
+      data: { query: query ,
+         endpoint:"query"
+      },
+    }); 
+    
+    
+    res.status(200).json(apiResponse);
   } catch (error) {
     console.error('Error fetching related objects:', error.message);
     res.status(500).json({ message: 'Error fetching related objects', error: error.message });

@@ -1,5 +1,6 @@
 const FlowMetadata = require('../models/flowMetadata.js');
-
+const SalesforceToken = require('../models/salesforceOrgModel.js');
+const { n8nSalesforceApiRequest } = require('../salesforceServices/tokenServices.js');
 exports.configMetadata = async (req, res) => {
   try {
     const { orgId, metadata, id ,configurationName} = req.body;  
@@ -57,7 +58,50 @@ exports.getMetadataById=async(req,res)=>{
     try{
         const id=req.params.id 
         const metadata=await FlowMetadata.findById(id)
-       
+   
+        res.status(200).json(metadata)
+    }
+    catch(error){
+        console.log(error)
+    }
+}
+
+
+exports.processMetadata=async(req,res)=>{
+    try{
+        const {orgId,id,processData,recordObjectId}=req.body
+        const org=await SalesforceToken.findOne({ orgId });
+        const {metadata}=await FlowMetadata.findOne({orgId,_id:id})
+        
+
+        for(const input of metadata[0].inputs){
+            if(input.actionType=='UPDATE_RECORD')
+            {
+                const{field,objectId,apiName}= input.setRecordObject 
+                const  body={
+                  [field]:processData[apiName]
+                }
+                const url = `${org.instanceUrl}/services/data/v57.0/sobjects/${objectId}/${recordObjectId}`; 
+                payload = {
+                  "url":url,
+                  "method": "PATCH",
+                  "endpoint":"record",
+                  "body": body
+                }
+                const axiosConfig = {
+                  method: 'post',
+                  url: process.env.N8N_URL,
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+               data: payload
+                };
+                const response = await n8nSalesforceApiRequest(axiosConfig);
+                console.log(response)
+            }
+        }
+        
+    
         res.status(200).json(metadata)
     }
     catch(error){
