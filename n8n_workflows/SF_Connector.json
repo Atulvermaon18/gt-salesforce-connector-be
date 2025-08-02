@@ -1,0 +1,166 @@
+[
+    {
+        "createdAt": "2025-08-02T07:23:52.488Z",
+        "updatedAt": "2025-08-02T07:26:51.000Z",
+        "id": "CnuKnH8epgoKO6d6",
+        "name": "SF Connector",
+        "active": false,
+        "isArchived": false,
+        "nodes": [
+            {
+                "parameters": {
+                    "httpMethod": "POST",
+                    "path": "salesforce",
+                    "responseMode": "lastNode",
+                    "responseData": "allEntries",
+                    "options": {}
+                },
+                "type": "n8n-nodes-base.webhook",
+                "typeVersion": 2,
+                "position": [
+                    -520,
+                    20
+                ],
+                "id": "cb2ae28b-440c-4119-9ddf-d62604245292",
+                "name": "Webhook2",
+                "webhookId": "6643d9fb-86b7-4c29-b965-fedb54f489f1"
+            },
+            {
+                "parameters": {
+                    "rules": {
+                        "values": [
+                            {
+                                "conditions": {
+                                    "options": {
+                                        "caseSensitive": true,
+                                        "leftValue": "",
+                                        "typeValidation": "strict",
+                                        "version": 2
+                                    },
+                                    "conditions": [
+                                        {
+                                            "leftValue": "={{ $json[\"body\"][\"endpoint\"] }}",
+                                            "rightValue": "query",
+                                            "operator": {
+                                                "type": "string",
+                                                "operation": "equals"
+                                            },
+                                            "id": "aeef0d7e-600b-4e2e-9358-eae97c4d5073"
+                                        }
+                                    ],
+                                    "combinator": "and"
+                                }
+                            },
+                            {
+                                "conditions": {
+                                    "options": {
+                                        "caseSensitive": true,
+                                        "leftValue": "",
+                                        "typeValidation": "strict",
+                                        "version": 2
+                                    },
+                                    "conditions": [
+                                        {
+                                            "id": "77cf268c-57a4-46fe-be0d-340c1bb57d3f",
+                                            "leftValue": "={{ $json[\"body\"][\"endpoint\"] }}",
+                                            "rightValue": "record",
+                                            "operator": {
+                                                "type": "string",
+                                                "operation": "equals",
+                                                "name": "filter.operator.equals"
+                                            }
+                                        }
+                                    ],
+                                    "combinator": "and"
+                                }
+                            }
+                        ]
+                    },
+                    "options": {}
+                },
+                "type": "n8n-nodes-base.switch",
+                "typeVersion": 3.2,
+                "position": [
+                    -320,
+                    20
+                ],
+                "id": "8712c873-3844-420c-bd5c-b85a19947e40",
+                "name": "Switch"
+            },
+            {
+                "parameters": {
+                    "resource": "search",
+                    "query": "={{ $json[\"body\"][\"query\"] }}"
+                },
+                "type": "n8n-nodes-base.salesforce",
+                "typeVersion": 1,
+                "position": [
+                    -60,
+                    -80
+                ],
+                "id": "004287c4-8e0c-481b-960c-8f984440ebad",
+                "name": "Perform a query1"
+            },
+            {
+                "parameters": {
+                    "method": "={{ $json[\"body\"][\"method\"].trim() }}",
+                    "url": "={{ $json[\"body\"][\"url\"] }}",
+                    "authentication": "predefinedCredentialType",
+                    "nodeCredentialType": "salesforceOAuth2Api",
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ $json[\"body\"][\"body\"] }}",
+                    "options": {}
+                },
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    -60,
+                    120
+                ],
+                "id": "7b3bd96f-29ce-470c-805b-f5cb029abcdd",
+                "name": "HTTP Request1"
+            }
+        ],
+        "connections": {
+            "Webhook2": {
+                "main": [
+                    [
+                        {
+                            "node": "Switch",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Switch": {
+                "main": [
+                    [
+                        {
+                            "node": "Perform a query1",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ],
+                    [
+                        {
+                            "node": "HTTP Request1",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            }
+        },
+        "settings": {
+            "executionOrder": "v1"
+        },
+        "staticData": null,
+        "meta": null,
+        "pinData": {},
+        "versionId": "f6440c1d-7bd4-41b3-91f8-25f68449e9f0",
+        "triggerCount": 0,
+        "tags": []
+    }
+]
