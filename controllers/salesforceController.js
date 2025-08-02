@@ -248,15 +248,32 @@ exports.salesforceGetObjectCount = asyncHandler(async (req, res) => {
     }
 
     try {
-      const config = {
-        method: 'get',
-        url: `${org.instanceUrl}/services/data/v57.0/limits/recordCount?sObjects=${objectApiName}`,
-      };
+      // const config = {
+      //   method: 'get',
+      //   url: `${org.instanceUrl}/services/data/v57.0/limits/recordCount?sObjects=${objectApiName}`,
+      // };
 
       // Fetch contacts from Salesforce
-      const count = await salesforceApiRequest(config, org);
-
-      return res.json(count);
+      // const count = await salesforceApiRequest(config, org);
+      const url= `${org.instanceUrl}/services/data/v57.0/limits/recordCount?sObjects=${objectApiName}`,
+      payload = {
+        "url":url,
+        "method": "GET",
+        "endpoint":"record",
+        "body": {}
+      }
+      const axiosConfig = {
+        method: 'post',
+        url: process.env.N8N_URL,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+     data: payload
+      };
+      const response = await n8nSalesforceApiRequest(axiosConfig);
+   
+      
+      return res.json(response);
     } catch (error) {
       console.error(`Error fetching count:`, error.message);
       return res.status(500).json({ message: "Error fetching Salesforce count" });
