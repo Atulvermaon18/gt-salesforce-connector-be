@@ -6,7 +6,9 @@
   "scripts": {
     "start": "nodemon server.js",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "export:n8n": "n8n export:workflow --id=CnuKnH8epgoKO6d6 --output='n8n_workflows/SF_Connector.json'",
+    "import:n8n": "n8n import:workflow --input='n8n_workflows/SF_Connector.json'"
   },
   "keywords": [],
   "author": "",
