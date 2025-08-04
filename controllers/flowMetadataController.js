@@ -108,3 +108,17 @@ exports.processMetadata=async(req,res)=>{
         console.log(error)
     }
 }
+exports.deleteMetadata=async(req,res)=>{
+    try{
+        const id=req.params.id 
+      
+     
+      const res=await FlowMetadata.findByIdAndDelete(id)
+      console.log(res)
+   
+        res.status(200).json({message:"Deleted successfully"})
+    }
+    catch(error){
+        console.log(error)
+    }
+}

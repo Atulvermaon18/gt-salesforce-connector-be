@@ -6,5 +6,5 @@ router.get('/',metadataControler.getMetadata)
 router.get('/:id',metadataControler.getMetadataById)
 router.post('/configuration',metadataControler.configMetadata)
 router.post('/process',metadataControler.processMetadata)
-
+router.delete('/',metadataControler.deleteMetadata)
 module.exports=router
