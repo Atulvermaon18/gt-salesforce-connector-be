@@ -19,6 +19,7 @@ const { decryptRequest, encryptResponse } = require('./middlewares/encryptionMid
 const { setupOAuthRoutes } = require('./utils/setupOAuth.js');
 const userPreferenceRoutes = require('./routes/userPreferenceRoutes.js');
 const flowMetadataRoutes = require('./routes/flowMetadataRoutes.js');
+const flowAssignmentsRoutes = require('./routes/flowAssignmentsRoutes.js');
 dotenv.config();
 
 
@@ -63,6 +64,7 @@ app.use("/api/salesforce", salesforceRoutes);
 app.use("/api/sobjects", sobjectRoutes);
 app.use("/api/userPreference", userPreferenceRoutes);
 app.use ("/api/metadata",flowMetadataRoutes)
+app.use("/api/flowAssignments",flowAssignmentsRoutes)
 // app.use('/api',orgRoutes);
 
 app.get('/', (req, res) => {
