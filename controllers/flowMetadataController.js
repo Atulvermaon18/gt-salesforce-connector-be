@@ -108,3 +108,22 @@ exports.processMetadata=async(req,res)=>{
         console.log(error)
     }
 }
+exports.deleteMetadata = async (req, res) => {
+try {
+const { id } = req.params; // Get ID from URL
+
+// Delete the record
+const deletedItem = await FlowMetadata.findByIdAndDelete(id);
+
+if (!deletedItem) {
+return res.status(404).json({ message: "Metadata not found" });
+}
+
+console.log("Deleted item:", deletedItem);
+
+return res.status(200).json({ message: "Deleted successfully" });
+} catch (error) {
+console.error("Error deleting metadata:", error);
+return res.status(500).json({ message: "An unexpected error occurred. Please try again later." });
+}
+};
