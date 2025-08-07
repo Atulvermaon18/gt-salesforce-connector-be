@@ -372,8 +372,11 @@ exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
       data: { query: query, 
          endpoint:"query"
       },
-    });
-    return res.json(apiResponse);
+    }); 
+    let resdata={objectDetails:apiResponse[0],
+      highlightFields:sobject.highlightFields
+    }; 
+    return res.json(resdata);
  
   } catch (error) {
     console.error("Error retrieving Salesforce object:", error.message);
@@ -578,56 +581,78 @@ exports.getSalesforceAppById = asyncHandler(async (req, res) => {
 //@route    GET /api/salesforce/relatedObjects
 //@access   Private
 
-exports.getRelatedObjects = asyncHandler(async (req,res)=>{
-  try{
-    const { orgId, objectApiName } = req.query;
-    if(!orgId || !objectApiName) return res.status(400).json({ message: 'orgId and objectApiName are required' });
-    const org=await SalesforceToken.findOne({ orgId });
-    if (!org) {
-      return res.status(404).json({ message: 'Salesforce org not found' });
+  exports.getRelatedObjects = asyncHandler(async (req,res)=>{
+    try{
+      const { orgId, objectApiName,objectId } = req.query;
+      if(!orgId || !objectApiName) return res.status(400).json({ message: 'orgId and objectApiName are required' });
+      const org=await SalesforceToken.findOne({ orgId });
+      if (!org) {
+        return res.status(404).json({ message: 'Salesforce org not found' });
+      }
+      const url = `${org.instanceUrl}/services/data/v57.0/ui-api/related-list-info/${objectApiName}`;
+      payload = {
+        "url":url,
+        "method": "GET",
+        "endpoint":"record",
+        "body": {}
+      }
+      const axiosConfig = {
+        method: 'post',
+        url: process.env.N8N_URL,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+    data: payload
+      };
+      const response = await n8nSalesforceApiRequest(axiosConfig);
+      const relatedLists=response[0].relatedLists;
+ 
+       const relatedListIds=relatedLists.map((relatedList)=>{
+  return relatedList.relatedListId
+}).join(',');
+const relatedListIdsUrl = `${org.instanceUrl}/services/data/v57.0/ui-api/related-list-count/batch/${objectId}/${relatedListIds}`;
+ payload = {
+  "url":relatedListIdsUrl,
+  "method": "GET",
+  "endpoint":"record",
+  "body": {}
+}
+      const relatedListIdsAxiosConfig = {
+        method: 'post',
+        url: process.env.N8N_URL,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      data: payload
+      };
+      console.log(relatedListIdsAxiosConfig);
+      const relatedListIdsResponse = await n8nSalesforceApiRequest(relatedListIdsAxiosConfig);
+      
+      if (relatedListIdsResponse[0]?.results) {
+        relatedListIdsResponse[0].results.forEach((item) => {
+          if (item.statusCode === 200 && item.result) {
+            const relatedList = relatedLists.find(
+              list => list.relatedListId === item.result.listReference.relatedListId
+            );
+            if (relatedList) {
+              relatedList.count = item.result.count;
+            }
+          }
+        });
+      }
+
+      res.status(200).json(relatedLists);
+    } catch (error) {
+      console.error('Error fetching related objects:', error.message);
+      res.status(500).json({ message: 'Error fetching related objects', error: error.message });
     }
-    const url = `${org.instanceUrl}/services/data/v57.0/ui-api/related-list-info/${objectApiName}`;
-    payload = {
-      "url":url,
-      "method": "GET",
-      "endpoint":"record",
-      "body": {}
-    }
-    const axiosConfig = {
-      method: 'post',
-      url: process.env.N8N_URL,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-   data: payload
-    };
-    const response = await n8nSalesforceApiRequest(axiosConfig);
-    const relatedLists=response[0].relatedLists;
-    // const childRels=response[0].childRelationships.filter(cr=>cr.deprecatedAndHidden==false)
-  //   const query =  ` `
-  //   const apiResponse = await n8nSalesforceApiRequest({
-  //     method: 'post',
-  //     url: process.env.N8N_URL,
-  //     endpoint:"query",
-  //     data: { query: query ,
-  //        endpoint:"query"
-  //     },
-  //   });
-
-  //   console.log(apiResponse);
-  //  const res={
-  //   childRelationships:response[0].childRelationships,
-  //   records:apiResponse[0].records
-  //  }
-    res.status(200).json(relatedLists);
-  } catch (error) {
-    console.error('Error fetching related objects:', error.message);
-    res.status(500).json({ message: 'Error fetching related objects', error: error.message });
-  }
-});
+  });
 
 
-
+// Get related objects records for a specific Salesforce object
+//@desc     Get related objects records for a specific Salesforce object
+//@route    GET /api/salesforce/relatedObjectRecords
+//@access   Private
 exports.getRelatedObjectRecords = asyncHandler(async (req,res)=>{
   try{
     const { orgId, relatedListId, objectId } = req.query;
@@ -661,6 +686,10 @@ exports.getRelatedObjectRecords = asyncHandler(async (req,res)=>{
   }
 }); 
 
+// Get object field values
+//@desc     Get object field values
+//@route    GET /api/salesforce/objectFieldValues
+//@access   Private
 exports.objectFieldValues = asyncHandler(async (req,res)=>{
   try{
     const { orgId, objectApiName ,fieldName} = req.query;

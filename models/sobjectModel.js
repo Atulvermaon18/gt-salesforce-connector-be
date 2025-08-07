@@ -23,6 +23,16 @@ const fieldSchema = new mongoose.Schema({
   }
 }, { _id: true });
 
+// Fixed highlightFieldsSchema - removed the array brackets around the object definition
+const highlightFieldsSchema = new mongoose.Schema({
+  image: { type: String, default: '' },
+  fields: [{  // This is correct - array of objects
+    label: {type: String, required: true},
+    type: {type: String, required: true},
+    value: {type: String, required: true}
+  }]
+},{_id:false});
+
 const sobjectSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -37,6 +47,7 @@ const sobjectSchema = new mongoose.Schema({
   labelPlural: String,
   permissionId: String,
   fields: [fieldSchema],
+  highlightFields: highlightFieldsSchema,  // This should work now
   metadata: {
     type: String,
     default: '{}'
@@ -45,4 +56,4 @@ const sobjectSchema = new mongoose.Schema({
 
 const SObject = mongoose.model('SObject', sobjectSchema);
 
-module.exports = SObject; 
+module.exports = SObject;

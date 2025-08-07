@@ -172,6 +172,9 @@ const salesforceApiRequest = async (config, token) => {
 
 const n8nSalesforceApiRequest = async (config) => {
     try {
+        if(!config?.data?.body){
+            config.data['body'] = {}
+        }
       const response = await axios.request(config)
       
       return response.data;

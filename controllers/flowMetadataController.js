@@ -3,7 +3,7 @@ const SalesforceToken = require('../models/salesforceOrgModel.js');
 const { n8nSalesforceApiRequest } = require('../salesforceServices/tokenServices.js');
 exports.configMetadata = async (req, res) => {
   try {
-    const { orgId, metadata, id ,configurationName} = req.body;  
+    const { orgId, metadata, id ,configurationName,associatedPages,n8n_url} = req.body;  
 
     if (!orgId || !metadata) {
       return res.status(400).json({ error: "Missing required fields: orgId or metadata" });
@@ -17,7 +17,9 @@ exports.configMetadata = async (req, res) => {
       const newMetadata = new FlowMetadata({
         orgId,
         configurationName,
-        metadata
+        metadata,
+        associatedPages,
+        n8n_url,
       });
 
       await newMetadata.save();
@@ -71,7 +73,7 @@ exports.processMetadata=async(req,res)=>{
     try{
         const {orgId,id,processData,recordObjectId}=req.body
         const org=await SalesforceToken.findOne({ orgId });
-        const {metadata}=await FlowMetadata.findOne({orgId,_id:id})
+        const {metadata,n8n_url}=await FlowMetadata.findOne({orgId,_id:id})
         
 
         for(const input of metadata[0].inputs){
@@ -100,11 +102,49 @@ exports.processMetadata=async(req,res)=>{
                 console.log(response)
             }
         }
-        
+        if(n8n_url){  
+          const axiosConfig = {
+            method: 'get',
+            url: n8n_url,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+         data:processData
+          };
+          const n8nresponse = await n8nSalesforceApiRequest(axiosConfig);
+     
+        }
     
         res.status(200).json(metadata)
     }
     catch(error){
         console.log(error)
     }
+
+
+
+
 }
+
+
+
+
+exports.getAssignedFlow = async (req, res) => {
+  try {
+    const orgId = req.query.orgId;
+    const objectApiName = req.query.objectApiName;
+
+    const metadata = await FlowMetadata.find({ orgId });
+
+    const data = metadata
+      .filter(item => item?.associatedPages.includes(objectApiName))
+      .map(item => ({
+        name: item.configurationName,
+        id: item._id
+      }));
+
+    res.status(200).json({ assignmentFlows: data });
+  } catch (error) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};

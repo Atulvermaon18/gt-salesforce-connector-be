@@ -1,7 +1,7 @@
 const createError = require('http-errors');
 const SObject = require('../models/sobjectModel');
 const Permission = require('../models/permissionModel');
-const axios = require('axios');
+const axios = require('axios'); 
 const SalesforceToken = require('../models/salesforceOrgModel.js');
 const { exchangeAuthCodeForToken, salesforceApiRequest,n8nSalesforceApiRequest } = require('../salesforceServices/tokenServices.js');
 
@@ -40,22 +40,33 @@ exports.getSObjects = async (req, res, next) => {
       const response = await n8nSalesforceApiRequest(axiosConfig);
   
       const sfObjects = response[0]?.sobjects || [];
-      // Save the objects to the database
-      const objectsToSave = sfObjects.filter(obj => {
-        if (!obj.label.includes('MISSING LABEL')) {
-          return {
-            name: obj.name,
-            label: obj.label,
-            keyPrefix: obj.keyPrefix,
-            labelPlural: obj.labelPlural,
-            fields: [],
-            metadata: JSON.stringify(obj)
-          }
-        }
-      });
+      // Transform and filter the objects before saving
+      const objectsToSave = sfObjects
+        .filter(obj => !obj.label.includes('MISSING LABEL'))
+        .map(obj => ({
+          name: obj.name,
+          label: obj.label,
+          keyPrefix: obj.keyPrefix,
+          labelPlural: obj.labelPlural,
+          fields: [],
+          metadata: JSON.stringify(obj),
+          highlightFields: {
+            image: "",
+            fields: [] // Initialize as empty array, will be populated later
+          },
+        }));
 
       if (objectsToSave.length > 0) {
-        await SObject.insertMany(objectsToSave);
+        // Use updateMany with upsert: true to handle duplicates
+        const bulkOps = objectsToSave.map(obj => ({
+          updateOne: {
+            filter: { name: obj.name },
+            update: { $set: obj },
+            upsert: true
+          }
+        }));
+        
+        await SObject.bulkWrite(bulkOps, { ordered: false });
       }
 
       // Get the saved objects back from DB
@@ -75,7 +86,8 @@ exports.getSObjects = async (req, res, next) => {
 
     res.json({ success: true, data: sObjects });
   } catch (error) {
-    next(error);
+    console.error('Error fetching Salesforce objects:', error.message);
+    res.status(500).json({ message: 'Error fetching Salesforce objects' });
   }
 };
 
@@ -83,10 +95,10 @@ exports.getSObjects = async (req, res, next) => {
 exports.getSObjectWithFields = async (req, res, next) => {
   try {
     const { sobjectName } = req.params;
-
+  
     // Try to find the sObject in DB
     let sObject = await SObject.findOne({ name: sobjectName }).lean();
-
+ 
     if (!sObject) {
       // sObject not found in DB, fetch from Salesforce
       const { orgId } = req.query;
@@ -98,14 +110,55 @@ exports.getSObjectWithFields = async (req, res, next) => {
         return res.status(404).json({ message: 'Salesforce org not found' });
       }
 
-      const config = {
-        method: 'get',
-        url: `${org.instanceUrl}/services/data/v57.0/sobjects/${sobjectName}/describe/`,
+     
+ 
+      const axiosConfig = {
+        method: 'post',
+        url: process.env.N8N_URL,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+     data: {
+      "url":`${org.instanceUrl}/services/data/v57.0/sobjects/${sobjectName}/describe/`,
+      "method": "GET",
+      "endpoint":"record"
+    }
       };
+      const response = await n8nSalesforceApiRequest(axiosConfig);
+      const sfObjectData = response[0];
+      
 
-      const response = await salesforceApiRequest(config, org);
-      const sfObjectData = response;
+     
+      const axiosHighlightFieldsConfig = {
+        method: 'post',
+        url: process.env.N8N_URL,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        data: {
+          "url":`${org.instanceUrl}/services/data/v57.0/sobjects/${sobjectName}/describe/compactLayouts`,
+          "method": "GET",
+          "endpoint":"record"
+        }
+      };
+     const getHighlightFields = await n8nSalesforceApiRequest(axiosHighlightFieldsConfig);
 
+     const image = getHighlightFields[0].compactLayouts[0].actions[0].icons[0].url
+     const fields = getHighlightFields[0].compactLayouts[0].fieldItems?.map(item => {
+      const label = item.label;
+      const fieldType = item.layoutComponents[0]?.fieldType || item.layoutComponents[0]?.type || "";
+      const fieldvalue = item.layoutComponents[0]?.value || "";
+      return {
+        label,
+        type: fieldType,
+        value: fieldvalue
+      };
+    }) || []; // Fallback to empty array if fieldItems is undefined
+    
+    const highlightFields={
+      image,
+      fields
+      };
       // Create new sObject with embedded fields
       sObject = new SObject({
         name: sfObjectData.name,
@@ -124,13 +177,15 @@ exports.getSObjectWithFields = async (req, res, next) => {
           custom: field.custom,
           metadata: JSON.stringify(field)
         })),
+        highlightFields,
         metadata: JSON.stringify(sfObjectData)
       });
 
       await sObject.save();
       // Get fresh copy with lean()
       sObject = await SObject.findOne({ name: sobjectName }).lean();
-    } else if (!sObject.fields || sObject.fields.length === 0) {
+    } 
+    else if (!sObject.fields || sObject.fields.length === 0) {
       // sObject exists but has no fields, fetch them from Salesforce
       const { orgId } = req.query;
       if (!orgId) {
@@ -140,15 +195,52 @@ exports.getSObjectWithFields = async (req, res, next) => {
       if (!org) {
         return res.status(404).json({ message: 'Salesforce org not found' });
       }
-
-      const config = {
-        method: 'get',
-        url: `${org.instanceUrl}/services/data/v57.0/sobjects/${sobjectName}/describe/`,
+ 
+      const axiosConfig = {
+        method: 'post',
+        url: process.env.N8N_URL,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+     data:  {
+      "url":`${org.instanceUrl}/services/data/v57.0/sobjects/${sobjectName}/describe/`,
+      "method": "GET",
+      "endpoint":"record",
+       
+    }
       };
+      const response = await n8nSalesforceApiRequest(axiosConfig);
+      const sfObjectData = response[0];
 
-      const response = await salesforceApiRequest(config, org);
-      const sfObjectData = response;
-
+      payload = {
+            "url":`${org.instanceUrl}/services/data/v57.0/sobjects/${sobjectName}/describe/compactLayouts`,
+            "method": "GET",
+            "endpoint":"record"
+          }
+      const axiosHighlightFieldsConfig = {
+        method: 'post',
+        url: process.env.N8N_URL,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+     data: payload, 
+      };
+      const getHighlightFields = await n8nSalesforceApiRequest(axiosHighlightFieldsConfig);
+      const image = getHighlightFields[0].compactLayouts[0].actions[0].icons[0].url 
+      const fields = getHighlightFields[0].compactLayouts[0].fieldItems?.map(item => {
+        const label = item.label
+        const fieldType = item.layoutComponents[0].fieldType||""
+        const fieldvalue = item.layoutComponents[0].value||""
+        return {
+          label,
+          type: fieldType,
+          value: fieldvalue
+        }
+       })
+       const highlightFields={
+        image,
+        fields
+       }
       // Add fields to existing sObject
       sObject.fields = sfObjectData.fields.map(field => ({
         name: field.name,
@@ -160,17 +252,19 @@ exports.getSObjectWithFields = async (req, res, next) => {
         precision: field.precision,
         scale: field.scale,
         custom: field.custom,
+    
         metadata: JSON.stringify(field)
       }));
-
+ 
       await SObject.updateOne(
         { _id: sObject._id },
-        { $set: { fields: sObject.fields } }
+        { $set: { fields: sObject.fields,  highlightFields:highlightFields } }
       );
 
       // Get fresh copy with fields
       sObject = await SObject.findOne({ name: sobjectName }).lean();
     }
+  
 
     res.json({
       success: true,
@@ -183,13 +277,17 @@ exports.getSObjectWithFields = async (req, res, next) => {
           labelPlural: sObject.labelPlural,
           permissionId: sObject.permissionId
         },
-        fields: sObject.fields || []
-      }
+        fields: sObject.fields || [],
+        highlightFields:sObject.highlightFields
+       
+      },
+    
     });
   } catch (error) {
+    console.log(error)
     next(error);
   }
-};
+  };
 
 // Save sObject permission mapping
 exports.saveSObjectPermission = async (req, res, next) => {
