@@ -120,7 +120,7 @@ exports.deleteRole = asyncHandler(async (req, res) => {
     if (role) {
         // Check if role has any users
         if (role.users && role.users.length > 0) {
-            res.status(400);
+            res.status(400).json({ message: 'Cannot delete role with assigned users' });
             throw new Error('Cannot delete role with assigned users');
         }
 
