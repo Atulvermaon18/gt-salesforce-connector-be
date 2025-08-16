@@ -225,8 +225,11 @@ exports.getSObjectWithFields = async (req, res, next) => {
         },
      data: payload, 
       };
+      compactLayoutable = sfObjectData.compactLayoutable;
+      let highlightFields={}
+     if(compactLayoutable){
       const getHighlightFields = await n8nSalesforceApiRequest(axiosHighlightFieldsConfig);
-      const image = getHighlightFields[0].compactLayouts[0].actions[0].icons[0].url 
+      const image = getHighlightFields[0].compactLayouts[0].actions?.[0].icons?.[0].url || "";
       const fields = getHighlightFields[0].compactLayouts[0].fieldItems?.map(item => {
         const label = item.label
         const fieldType = item.layoutComponents[0].fieldType||""
@@ -237,10 +240,12 @@ exports.getSObjectWithFields = async (req, res, next) => {
           value: fieldvalue
         }
        })
-       const highlightFields={
+       highlightFields={
         image,
         fields
        }
+     }
+      
       // Add fields to existing sObject
       sObject.fields = sfObjectData.fields.map(field => ({
         name: field.name,
@@ -252,6 +257,8 @@ exports.getSObjectWithFields = async (req, res, next) => {
         precision: field.precision,
         scale: field.scale,
         custom: field.custom,
+        referenceTo: field.referenceTo,
+        relationshipName: field.relationshipName,
     
         metadata: JSON.stringify(field)
       }));

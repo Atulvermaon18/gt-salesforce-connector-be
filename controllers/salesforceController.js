@@ -178,7 +178,7 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
 //@access   Private
 exports.salesforceGetObjectByOrgId = asyncHandler(async (req, res) => {
   try {
-    const { objectApiName, orgId, page, limit, sortField, sortDirection } = req.query;
+    const { objectApiName, orgId, page, limit, sortField, sortDirection ,search} = req.query;
 
     if (!orgId) {
       return res.status(400).json({ message: 'orgId is required' });
@@ -214,16 +214,36 @@ exports.salesforceGetObjectByOrgId = asyncHandler(async (req, res) => {
       }
       // fieldsClause = 'Id,' + fieldsClause
     }
-    const query = `SELECT ${fieldsClause} FROM ${objectApiName} ORDER BY ${sortField || 'Id'} ${sortDirection || 'ASC'} LIMIT ${limit || 100} OFFSET ${((page || 1) - 1) * (limit || 100)}`;
+    // Define searchable fields
+    const searchableFields = ['Name', 'Email'];
     
+    // Build the base query
+    let query = `SELECT ${fieldsClause} FROM ${objectApiName}`;
+    
+    // Add search condition if search term is provided
+    if (search && search.trim() !== '') {
+      const searchTerm = search.trim().toLowerCase();
+      const searchConditions = searchableFields
+        .filter(field => fieldsClause.includes(field)) // Only include fields that are in the select
+        .map(field => `${field} LIKE '%${searchTerm}%'`)
+        .join(' OR ');
+      
+      if (searchConditions) {
+        query += ` WHERE (${searchConditions})`;
+      }
+    }
+    
+    // Add sorting and pagination
+    query += ` ORDER BY ${sortField || 'Id'} ${sortDirection || 'ASC'}`;
+    query += ` LIMIT ${limit || 100} OFFSET ${((page || 1) - 1) * (limit || 100)}`;
+
     const apiResponse = await n8nSalesforceApiRequest({
       method: 'post',
       url: process.env.N8N_URL,
-      endpoint:"query",
-      data: { query: query ,
+      data: { query: query, 
          endpoint:"query"
       },
-    });
+    }); 
     return res.json(apiResponse);
   
   } catch (error) {
@@ -347,6 +367,7 @@ exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
 
     // Determine which fields the user can access
     let fieldList = '*';
+    let referenceTo = [];
     if (sobject && sobject.fields && sobject.fields.length > 0) {
       // Filter fields based on permissions
       const accessibleFields = sobject.fields
@@ -358,12 +379,20 @@ exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
       if (accessibleFields.length > 0) {
         // Use only accessible fields in the query
         fieldList = accessibleFields.map(field => field.name).join(',');
+     
+        referenceTo = accessibleFields
+        .filter(field => field.type === 'reference' && field.referenceTo && field.referenceTo[0])
+        .map(item => ({
+          relationshipName: item.relationshipName,
+          objectApiName: item.referenceTo[0]
+        }))
+       
       } else {
         // If no fields are accessible, return empty record
         return res.json({});
       }
       // fieldList = 'Id,' + fieldList
-    }
+    } 
     const query = `SELECT ${fieldList} FROM ${objectApiName} WHERE Id = '${objectId}'`;
     // console.log(query);
     const apiResponse = await n8nSalesforceApiRequest({
@@ -373,8 +402,28 @@ exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
          endpoint:"query"
       },
     }); 
-    let resdata={objectDetails:apiResponse[0],
-      highlightFields:sobject.highlightFields
+    for(const item of referenceTo){
+      const fieldName = `${item.relationshipName}Id`; 
+      item['data'] = apiResponse[0][fieldName]; 
+      if(item['data']){
+        const query = `SELECT Id ,Name FROM ${item.objectApiName} WHERE Id = '${item['data']}'`;
+    
+        const responseData = await n8nSalesforceApiRequest({
+          method: 'post',
+          url: process.env.N8N_URL,
+          data: { query: query, 
+             endpoint:"query"
+          },
+        }); 
+        item['Name']=responseData[0].Name
+        console.log(responseData)
+      } 
+    }
+    
+    let resdata={ 
+      objectDetails:apiResponse[0],
+      highlightFields:sobject.highlightFields,
+      referenceObjectDetail:  referenceTo
     }; 
     return res.json(resdata);
  
@@ -624,8 +673,7 @@ const relatedListIdsUrl = `${org.instanceUrl}/services/data/v57.0/ui-api/related
           'Content-Type': 'application/json',
         },
       data: payload
-      };
-      console.log(relatedListIdsAxiosConfig);
+      }; 
       const relatedListIdsResponse = await n8nSalesforceApiRequest(relatedListIdsAxiosConfig);
       
       if (relatedListIdsResponse[0]?.results) {

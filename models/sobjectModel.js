@@ -16,6 +16,8 @@ const fieldSchema = new mongoose.Schema({
   precision: Number,
   scale: Number,
   custom: Boolean,
+  referenceTo:[String],
+  relationshipName: String,
   permissionId: String,
   metadata: {
     type: String,

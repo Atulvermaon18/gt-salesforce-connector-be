@@ -22,7 +22,9 @@ exports.createPermission = async (req, res) => {
         if (!req.body.name || !req.body.name.trim()) {
             return res.status(400).json({ message: 'Permission name cannot be empty' });
         }
-
+            if(req.body.name === "Super Admin"){
+                return res.status(400).json({ message: 'Permission name cannot be Super Admin' });
+            }
         // Check if qCode is empty
         // if (!req.body.qCode || !req.body.qCode.trim()) {
         //     return res.status(400).json({ message: 'Permission  cannot be empty' });
@@ -35,13 +37,13 @@ exports.createPermission = async (req, res) => {
             ]
         });
 
-        // if (existingPermission) {
-        //     return res.status(400).json({
-        //         message: existingPermission.name === req.body.name.trim()
-        //             ? 'Permission name already exists'
-        //             : 'Permission qCode already exists'
-        //     });
-        // }
+        if (existingPermission) {
+            return res.status(400).json({
+                message: existingPermission.name === req.body.name.trim()
+                    ? 'Permission name already exists'
+                    : 'Permission qCode already exists'
+            });
+        }
 
         const permission = new Permission({
             name: req.body.name.trim(),
