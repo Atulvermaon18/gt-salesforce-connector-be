@@ -9,6 +9,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const Session = require('../models/sessionModel.js');
 const SalesforceOrg = require('../models/salesforceOrgModel.js');
+const role=require('../models/roleModel.js')
 
 //@desc     Auth User & Get Token
 //@route    POST api/users/login
@@ -55,16 +56,20 @@ exports.login = asyncHandler(async (req, res) => {
       ]);
 
       // Process role
-      const role = user.role ? {
-        _id: user.role._id,
-        name: user.role.name,
-        description: user.role.description,
-        // permissions: user.role.permissions.map(permission => ({
-        //   _id: permission._id,
-        //   name: permission.name,
-        //   description: permission.description
-        // }))
-      } : null;
+      const permission=await role.find({users:user._id}).lean().populate({
+        path:'permissions',
+        select:'_id name description sobject resource modules'
+      })
+      // const role = permission ? {
+      //   _id: permission._id,
+      //   name: permission.name,
+      //   description: permission.description,
+      //   // permissions: permission.permissions.map(permission => ({
+      //   //   _id: permission._id,
+      //   //   name: permission.name,
+      //   //   description: permission.description
+      //   // }))
+      // } : null;
 
       // Set refresh token in HTTP-only cookie
       res.cookie('refreshToken', refreshToken, {
@@ -84,7 +89,7 @@ exports.login = asyncHandler(async (req, res) => {
         isActive: user.isActive,
         companyId: user.companyId,
         orgIds: user.orgIds,
-        role,
+        role:permission,
         token: accessToken,
       });
     } else {

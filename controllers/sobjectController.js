@@ -35,7 +35,7 @@ exports.getSObjects = async (req, res, next) => {
         headers: {
           'Content-Type': 'application/json',
         },
-     data: payload
+        data: payload
       };
       const response = await n8nSalesforceApiRequest(axiosConfig);
   

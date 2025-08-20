@@ -1,6 +1,7 @@
 const Permission = require("../models/permissionModel.js");
 const Role = require('../models/roleModel.js');
-
+const sobject=require('../models/sobjectModel.js')
+const resource=require('../models/resourceModel.js')
 //@desc     Get all permissions
 //@route    GET api/permissions
 //@access   Public
@@ -8,6 +9,21 @@ exports.getPermissions = async (req, res) => {
     try {
         const permissions = await Permission.find().select('_id name description qCode sobject');
         res.json(permissions);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+// Get permission by id
+//@desc     Get permission by id
+//@route    GET api/permissions/:permissionId
+//@access   Public
+exports.getPermissionsById = async (req, res) => {
+    try {
+        const permission = await Permission.findById(req.params.permissionId).select('_id name description sobject modules');
+        if (!permission) {
+            return res.status(404).json({ message: 'Permission not found' });
+        }
+        res.json(permission);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -50,10 +66,14 @@ exports.createPermission = async (req, res) => {
             description: req.body.description, 
             // qCode: req.body.qCode.trim(),
             sobject: req.body.sobject,
+            modules: req.body.modules,
             
         });
         await permission.save();
-        res.status(201).json({ message: 'Permission created successfully' });
+        res.status(201).json({
+            id: permission._id,
+            name: permission.name
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -82,6 +102,10 @@ exports.updatePermission = async (req, res) => {
             updateFields.sobject = req.body.sobject;
         }
 
+        if (req.body.modules) {
+            updateFields.modules = req.body.modules;
+        }
+
         // Check if permission exists
         const existingPermission = await Permission.findById(req.params.permissionId);
         if (!existingPermission) {
@@ -89,12 +113,11 @@ exports.updatePermission = async (req, res) => {
         }
 
         // Check for duplicates only if name or qCode is being updated
-        if (updateFields.name || updateFields.qCode) {
+        if (updateFields.name) {
             const duplicatePermission = await Permission.findOne({
                 _id: { $ne: req.params.permissionId },
                 $or: [
-                    { name: updateFields.name || existingPermission.name },
-                    { qCode: updateFields.qCode || existingPermission.qCode }
+                    { name: updateFields.name || existingPermission.name }, 
                 ]
             });
 
@@ -102,7 +125,7 @@ exports.updatePermission = async (req, res) => {
                 return res.status(400).json({
                     message: duplicatePermission.name === (updateFields.name || existingPermission.name)
                         ? 'Permission name already exists'
-                        : 'Permission qCode already exists'
+                            : 'Permission qCode already exists'
                 });
             }
         }
@@ -141,6 +164,17 @@ exports.deletePermission = async (req, res) => {
         await Permission.findByIdAndDelete(req.params.permissionId);
         res.status(200).json({ message: 'Permission deleted successfully' });
     } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+exports.getPermissionList = async (req, res) => {
+    try {
+        const resources = await resource.find().sort({ name: 1 }).lean();
+        const sobjects = await sobject.find().lean().select('_id name label fields');
+        res.json({ resources, sobjects });
+    } catch (error) {
+        co
         res.status(500).json({ message: error.message });
     }
 };
