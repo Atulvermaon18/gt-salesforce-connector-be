@@ -1,7 +1,7 @@
 const axios = require('axios');
 const SalesforceToken = require('../models/salesforceOrgModel.js');
 const asyncHandler = require('express-async-handler');
-const { exchangeAuthCodeForToken, salesforceApiRequest,n8nSalesforceApiRequest } = require('../salesforceServices/tokenServices.js');
+const { exchangeAuthCodeForToken, salesforceApiRequest, n8nSalesforceApiRequest } = require('../salesforceServices/tokenServices.js');
 const Company = require('../models/companyModel');
 const SalesforceOrg = require('../models/salesforceOrgModel');
 const User = require('../models/userModel.js');
@@ -178,7 +178,7 @@ exports.exchangeAuthCode = asyncHandler(async (req, res) => {
 //@access   Private
 exports.salesforceGetObjectByOrgId = asyncHandler(async (req, res) => {
   try {
-    const { objectApiName, orgId, page, limit, sortField, sortDirection ,search} = req.query;
+    const { objectApiName, orgId, page, limit, sortField, sortDirection, search } = req.query;
 
     if (!orgId) {
       return res.status(400).json({ message: 'orgId is required' });
@@ -216,10 +216,10 @@ exports.salesforceGetObjectByOrgId = asyncHandler(async (req, res) => {
     }
     // Define searchable fields
     const searchableFields = ['Name', 'Email'];
-    
+
     // Build the base query
     let query = `SELECT ${fieldsClause} FROM ${objectApiName}`;
-    
+
     // Add search condition if search term is provided
     if (search && search.trim() !== '') {
       const searchTerm = search.trim().toLowerCase();
@@ -227,12 +227,12 @@ exports.salesforceGetObjectByOrgId = asyncHandler(async (req, res) => {
         .filter(field => fieldsClause.includes(field)) // Only include fields that are in the select
         .map(field => `${field} LIKE '%${searchTerm}%'`)
         .join(' OR ');
-      
+
       if (searchConditions) {
         query += ` WHERE (${searchConditions})`;
       }
     }
-    
+
     // Add sorting and pagination
     query += ` ORDER BY ${sortField || 'Id'} ${sortDirection || 'ASC'}`;
     query += ` LIMIT ${limit || 100} OFFSET ${((page || 1) - 1) * (limit || 100)}`;
@@ -240,12 +240,13 @@ exports.salesforceGetObjectByOrgId = asyncHandler(async (req, res) => {
     const apiResponse = await n8nSalesforceApiRequest({
       method: 'post',
       url: process.env.N8N_URL,
-      data: { query: query, 
-         endpoint:"query"
+      data: {
+        query: query,
+        endpoint: "query"
       },
-    }); 
+    });
     return res.json(apiResponse);
-  
+
   } catch (error) {
     console.error("Error fetching Salesforce objects:", error.message);
     res.status(500).json({ message: "Error fetching Salesforce objects" });
@@ -275,24 +276,24 @@ exports.salesforceGetObjectCount = asyncHandler(async (req, res) => {
 
       // Fetch contacts from Salesforce
       // const count = await salesforceApiRequest(config, org);
-      const url= `${org.instanceUrl}/services/data/v57.0/limits/recordCount?sObjects=${objectApiName}`,
-      payload = {
-        "url":url,
-        "method": "GET",
-        "endpoint":"record",
-        "body": {}
-      }
+      const url = `${org.instanceUrl}/services/data/v57.0/limits/recordCount?sObjects=${objectApiName}`,
+        payload = {
+          "url": url,
+          "method": "GET",
+          "endpoint": "record",
+          "body": {}
+        }
       const axiosConfig = {
         method: 'post',
         url: process.env.N8N_URL,
         headers: {
           'Content-Type': 'application/json',
         },
-     data: payload
+        data: payload
       };
       const response = await n8nSalesforceApiRequest(axiosConfig);
-   
-      
+
+
       return res.json(response);
     } catch (error) {
       console.error(`Error fetching count:`, error.message);
@@ -312,32 +313,31 @@ exports.salesforceCreateObjectByOrgId = asyncHandler(async (req, res) => {
     const { orgId, objectApiName, objectData } = req.body; // Get the orgId and contacts from the request body
 
     // Fetch the Salesforce token for the orgId
-    const token = await SalesforceToken.findOne({ orgId }).sort({ updatedAt: -1 });
-    if (!token) {
-      return res.status(401).json({ message: 'No Salesforce connection found for this orgId' });
-    }
-
+    // const token = await SalesforceToken.findOne({ orgId }).sort({ updatedAt: -1 });
+    // if (!token) {
+    //   return res.status(401).json({ message: 'No Salesforce connection found for this orgId' });
+    // }
+    const org=await SalesforceToken.findOne({ orgId });
     // Loop through each contact and create it in Salesforce
     const createdObject = [];
     for (const object of objectData) {
-      const config = {
-        method: 'post',
-        url: `${token.instanceUrl}/services/data/v57.0/sobjects/${objectApiName}`,
-        body: object,
-      };
-      console.log(config.url);
-      // Create contact in Salesforce
-      const createdObject = await salesforceApiRequest(config, token);
-      if (createdObject.newAccessToken) {
-        token.accessToken = createdObject.newAccessToken;
-        token.refreshToken = createdObject.newRefreshToken
-        token.idToken = createdObject.newIdToken // Update the token with the new access token
+      const payload={
+        "url": `${org.instanceUrl}/services/data/v57.0/sobjects/${objectApiName}`,
+        "method": "POST",
+        "endpoint": "record",
+        "body": object
       }
-
-      createdObject.push(createdObject);
+      const axiosConfig = {
+        method: 'post',
+        url: process.env.N8N_URL,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        data: payload
+      };
+      const response = await n8nSalesforceApiRequest(axiosConfig);
+      createdObject.push(response);
     }
-
-    // Return the created contacts
     return res.json(createdObject);
   } catch (error) {
     console.error("Error creating Salesforce contacts:", error.message);
@@ -379,54 +379,56 @@ exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
       if (accessibleFields.length > 0) {
         // Use only accessible fields in the query
         fieldList = accessibleFields.map(field => field.name).join(',');
-     
+
         referenceTo = accessibleFields
-        .filter(field => field.type === 'reference' && field.referenceTo && field.referenceTo[0])
-        .map(item => ({
-          relationshipName: item.relationshipName,
-          objectApiName: item.referenceTo[0]
-        }))
-       
+          .filter(field => field.type === 'reference' && field.referenceTo && field.referenceTo[0])
+          .map(item => ({
+            relationshipName: item.relationshipName,
+            objectApiName: item.referenceTo[0]
+          }))
+
       } else {
         // If no fields are accessible, return empty record
         return res.json({});
       }
       // fieldList = 'Id,' + fieldList
-    } 
+    }
     const query = `SELECT ${fieldList} FROM ${objectApiName} WHERE Id = '${objectId}'`;
     // console.log(query);
     const apiResponse = await n8nSalesforceApiRequest({
       method: 'post',
       url: process.env.N8N_URL,
-      data: { query: query, 
-         endpoint:"query"
+      data: {
+        query: query,
+        endpoint: "query"
       },
-    }); 
-    for(const item of referenceTo){
-      const fieldName = `${item.relationshipName}Id`; 
-      item['data'] = apiResponse[0][fieldName]; 
-      if(item['data']){
+    });
+    for (const item of referenceTo) {
+      const fieldName = `${item.relationshipName}Id`;
+      item['data'] = apiResponse[0][fieldName];
+      if (item['data']) {
         const query = `SELECT Id ,Name FROM ${item.objectApiName} WHERE Id = '${item['data']}'`;
-    
+
         const responseData = await n8nSalesforceApiRequest({
           method: 'post',
           url: process.env.N8N_URL,
-          data: { query: query, 
-             endpoint:"query"
+          data: {
+            query: query,
+            endpoint: "query"
           },
-        }); 
-        item['Name']=responseData[0].Name
+        });
+        item['Name'] = responseData[0].Name
         console.log(responseData)
-      } 
+      }
     }
-    
-    let resdata={ 
-      objectDetails:apiResponse[0],
-      highlightFields:sobject.highlightFields,
-      referenceObjectDetail:  referenceTo
-    }; 
+
+    let resdata = {
+      objectDetails: apiResponse[0],
+      highlightFields: sobject.highlightFields,
+      referenceObjectDetail: referenceTo
+    };
     return res.json(resdata);
- 
+
   } catch (error) {
     console.error("Error retrieving Salesforce object:", error.message);
     return res.status(500).json({ message: "Error retrieving Salesforce object" });
@@ -462,15 +464,41 @@ exports.salesforceDescribe = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Salesforce org not found' });
     }
 
-    const config = {
-      method: 'get',
-      url: `${org.instanceUrl}/services/data/v57.0/sobjects/${objectApiName}/describe`,
-    };
 
-    const objectDescription = await salesforceApiRequest(config, org);
-    delete objectDescription.childRelationships;
-    delete objectDescription.urls;
-    res.status(200).json(objectDescription);
+
+    const axiosConfig = {
+      method: 'post',
+      url: process.env.N8N_URL,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      data: {
+        url: `${org.instanceUrl}/services/data/v57.0/sobjects/${objectApiName}/describe`,
+        method: "GET",
+        endpoint: "record",
+        body: {}
+      }
+    };
+    const objectDescription = await n8nSalesforceApiRequest(axiosConfig);
+    delete objectDescription[0].childRelationships;
+    delete objectDescription[0].urls;
+      for(const field of objectDescription[0].fields){
+        if(field.type === 'reference' && field.createable && !field.autoNumber && !field.calculated){
+          let query = `SELECT Id,Name FROM ${field.referenceTo[0]}`; 
+          const apiResponse = await n8nSalesforceApiRequest({
+            method: 'post',
+            url: process.env.N8N_URL,
+            data: {
+              query: query,
+              endpoint: "query"
+            },
+          });
+          field['referenceOptions'] = apiResponse;
+        }
+      }
+        
+
+    res.status(200).json(objectDescription[0]);
   } catch (error) {
     console.error("Error fetching Salesforce object description:", error.message);
     res.status(500).json({ message: "Error fetching Salesforce object description" });
@@ -525,10 +553,10 @@ exports.getSalesforceApps = asyncHandler(async (req, res) => {
     }
     const url = `${org.instanceUrl}/services/data/v57.0/ui-api/apps?formFactor=Large`;
     payload = {
-      "url":url,
+      "url": url,
       "method": "GET",
       "body": {},
-      "endpoint":"record"
+      "endpoint": "record"
     }
     const axiosConfig = {
       method: 'post',
@@ -536,10 +564,10 @@ exports.getSalesforceApps = asyncHandler(async (req, res) => {
       headers: {
         'Content-Type': 'application/json',
       },
-   data: payload
+      data: payload
     };
     const response = await n8nSalesforceApiRequest(axiosConfig);
-   
+
     res.status(200).json(response[0]);
   } catch (error) {
     console.error('Error fetching Salesforce apps:', error.message);
@@ -561,11 +589,11 @@ exports.getSalesforceAppById = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Salesforce org not found' });
     }
     const url = `${org.instanceUrl}/services/data/v57.0/ui-api/apps/${appId}?formFactor=Large`;
- 
+
     payload = {
-      "url":url,
+      "url": url,
       "method": "GET",
-      "endpoint":"record",
+      "endpoint": "record",
       "body": {}
     }
     const axiosConfig = {
@@ -574,7 +602,7 @@ exports.getSalesforceAppById = asyncHandler(async (req, res) => {
       headers: {
         'Content-Type': 'application/json',
       },
-   data: payload
+      data: payload
     };
     const response = await n8nSalesforceApiRequest(axiosConfig);
     // Get the app data
@@ -630,90 +658,19 @@ exports.getSalesforceAppById = asyncHandler(async (req, res) => {
 //@route    GET /api/salesforce/relatedObjects
 //@access   Private
 
-  exports.getRelatedObjects = asyncHandler(async (req,res)=>{
-    try{
-      const { orgId, objectApiName,objectId } = req.query;
-      if(!orgId || !objectApiName) return res.status(400).json({ message: 'orgId and objectApiName are required' });
-      const org=await SalesforceToken.findOne({ orgId });
-      if (!org) {
-        return res.status(404).json({ message: 'Salesforce org not found' });
-      }
-      const url = `${org.instanceUrl}/services/data/v57.0/ui-api/related-list-info/${objectApiName}`;
-      payload = {
-        "url":url,
-        "method": "GET",
-        "endpoint":"record",
-        "body": {}
-      }
-      const axiosConfig = {
-        method: 'post',
-        url: process.env.N8N_URL,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-    data: payload
-      };
-      const response = await n8nSalesforceApiRequest(axiosConfig);
-      const relatedLists=response[0].relatedLists;
- 
-       const relatedListIds=relatedLists.map((relatedList)=>{
-  return relatedList.relatedListId
-}).join(',');
-const relatedListIdsUrl = `${org.instanceUrl}/services/data/v57.0/ui-api/related-list-count/batch/${objectId}/${relatedListIds}`;
- payload = {
-  "url":relatedListIdsUrl,
-  "method": "GET",
-  "endpoint":"record",
-  "body": {}
-}
-      const relatedListIdsAxiosConfig = {
-        method: 'post',
-        url: process.env.N8N_URL,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      data: payload
-      }; 
-      const relatedListIdsResponse = await n8nSalesforceApiRequest(relatedListIdsAxiosConfig);
-      
-      if (relatedListIdsResponse[0]?.results) {
-        relatedListIdsResponse[0].results.forEach((item) => {
-          if (item.statusCode === 200 && item.result) {
-            const relatedList = relatedLists.find(
-              list => list.relatedListId === item.result.listReference.relatedListId
-            );
-            if (relatedList) {
-              relatedList.count = item.result.count;
-            }
-          }
-        });
-      }
-
-      res.status(200).json(relatedLists);
-    } catch (error) {
-      console.error('Error fetching related objects:', error.message);
-      res.status(500).json({ message: 'Error fetching related objects', error: error.message });
-    }
-  });
-
-
-// Get related objects records for a specific Salesforce object
-//@desc     Get related objects records for a specific Salesforce object
-//@route    GET /api/salesforce/relatedObjectRecords
-//@access   Private
-exports.getRelatedObjectRecords = asyncHandler(async (req,res)=>{
-  try{
-    const { orgId, relatedListId, objectId } = req.query;
-    if(!orgId || !relatedListId || !objectId) return res.status(400).json({ message: 'orgId and relatedListId and objectId are required' });
-    const org=await SalesforceToken.findOne({ orgId });
+exports.getRelatedObjects = asyncHandler(async (req, res) => {
+  try {
+    const { orgId, objectApiName, objectId } = req.query;
+    if (!orgId || !objectApiName) return res.status(400).json({ message: 'orgId and objectApiName are required' });
+    const org = await SalesforceToken.findOne({ orgId });
     if (!org) {
       return res.status(404).json({ message: 'Salesforce org not found' });
     }
-    const url = `${org.instanceUrl}/services/data/v57.0/ui-api/related-list-records/${objectId}/${relatedListId}`; 
+    const url = `${org.instanceUrl}/services/data/v57.0/ui-api/related-list-info/${objectApiName}`;
     payload = {
-      "url":url,
+      "url": url,
       "method": "GET",
-      "endpoint":"record",
+      "endpoint": "record",
       "body": {}
     }
     const axiosConfig = {
@@ -722,42 +679,114 @@ exports.getRelatedObjectRecords = asyncHandler(async (req,res)=>{
       headers: {
         'Content-Type': 'application/json',
       },
-   data: payload
+      data: payload
     };
     const response = await n8nSalesforceApiRequest(axiosConfig);
- 
-    
+    const relatedLists = response[0].relatedLists;
+
+    const relatedListIds = relatedLists.map((relatedList) => {
+      return relatedList.relatedListId
+    }).join(',');
+    const relatedListIdsUrl = `${org.instanceUrl}/services/data/v57.0/ui-api/related-list-count/batch/${objectId}/${relatedListIds}`;
+    payload = {
+      "url": relatedListIdsUrl,
+      "method": "GET",
+      "endpoint": "record",
+      "body": {}
+    }
+    const relatedListIdsAxiosConfig = {
+      method: 'post',
+      url: process.env.N8N_URL,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      data: payload
+    };
+    const relatedListIdsResponse = await n8nSalesforceApiRequest(relatedListIdsAxiosConfig);
+
+    if (relatedListIdsResponse[0]?.results) {
+      relatedListIdsResponse[0].results.forEach((item) => {
+        if (item.statusCode === 200 && item.result) {
+          const relatedList = relatedLists.find(
+            list => list.relatedListId === item.result.listReference.relatedListId
+          );
+          if (relatedList) {
+            relatedList.count = item.result.count;
+          }
+        }
+      });
+    }
+
+    res.status(200).json(relatedLists);
+  } catch (error) {
+    console.error('Error fetching related objects:', error.message);
+    res.status(500).json({ message: 'Error fetching related objects', error: error.message });
+  }
+});
+
+
+// Get related objects records for a specific Salesforce object
+//@desc     Get related objects records for a specific Salesforce object
+//@route    GET /api/salesforce/relatedObjectRecords
+//@access   Private
+exports.getRelatedObjectRecords = asyncHandler(async (req, res) => {
+  try {
+    const { orgId, relatedListId, objectId } = req.query;
+    if (!orgId || !relatedListId || !objectId) return res.status(400).json({ message: 'orgId and relatedListId and objectId are required' });
+    const org = await SalesforceToken.findOne({ orgId });
+    if (!org) {
+      return res.status(404).json({ message: 'Salesforce org not found' });
+    }
+    const url = `${org.instanceUrl}/services/data/v57.0/ui-api/related-list-records/${objectId}/${relatedListId}`;
+    payload = {
+      "url": url,
+      "method": "GET",
+      "endpoint": "record",
+      "body": {}
+    }
+    const axiosConfig = {
+      method: 'post',
+      url: process.env.N8N_URL,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      data: payload
+    };
+    const response = await n8nSalesforceApiRequest(axiosConfig);
+
+
     res.status(200).json(response[0]);
   } catch (error) {
     console.error('Error fetching related objects:', error.message);
     res.status(500).json({ message: 'Error fetching related objects', error: error.message });
   }
-}); 
+});
 
 // Get object field values
 //@desc     Get object field values
 //@route    GET /api/salesforce/objectFieldValues
 //@access   Private
-exports.objectFieldValues = asyncHandler(async (req,res)=>{
-  try{
-    const { orgId, objectApiName ,fieldName} = req.query;
-    if(!orgId || !objectApiName || !fieldName) return res.status(400).json({ message: 'orgId and objectApiName and fieldName are required' });
-    const org=await SalesforceToken.findOne({ orgId });
+exports.objectFieldValues = asyncHandler(async (req, res) => {
+  try {
+    const { orgId, objectApiName, fieldName } = req.query;
+    if (!orgId || !objectApiName || !fieldName) return res.status(400).json({ message: 'orgId and objectApiName and fieldName are required' });
+    const org = await SalesforceToken.findOne({ orgId });
     if (!org) {
       return res.status(404).json({ message: 'Salesforce org not found' });
     }
     const query = `SELECT ${fieldName} FROM ${objectApiName}`;
-    
+
     const apiResponse = await n8nSalesforceApiRequest({
       method: 'post',
       url: process.env.N8N_URL,
-      endpoint:"query",
-      data: { query: query ,
-         endpoint:"query"
+      endpoint: "query",
+      data: {
+        query: query,
+        endpoint: "query"
       },
-    }); 
-    
-    
+    });
+
+
     res.status(200).json(apiResponse);
   } catch (error) {
     console.error('Error fetching related objects:', error.message);

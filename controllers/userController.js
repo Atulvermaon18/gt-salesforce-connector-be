@@ -803,13 +803,13 @@ exports.getLoginLogoutLogs = asyncHandler(async (req, res) => {
 
     // Determine the query based on user permissions
     let query = {};
-    if (req.user.role.some(role => role.permissions.some(permission => permission.qCode === 'VIEW_ALL_AUDIT'))) {
-      query = {};
-    } else if (req.user.role.some(role => role.permissions.some(permission => permission.qCode === 'VIEW_SELF_AUDIT'))) {
-      query = { userId: req.user._id };
-    } else {
-      return res.status(401).json({ message: 'Not authorized to view logs' });
-    }
+    // if (req.user.role?.some(role => role.permissions?.some(permission => permission.qCode === 'VIEW_ALL_AUDIT'))) {
+    //   query = {};
+    // } else if (req.user.role?.some(role => role.permissions?.some(permission => permission.qCode === 'VIEW_SELF_AUDIT'))) {
+    //   query = { userId: req.user._id };
+    // } else {
+    //   return res.status(401).json({ message: 'Not authorized to view logs' });
+    // }
 
     // Add search filter
     if (search) {
