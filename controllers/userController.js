@@ -9,7 +9,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const Session = require('../models/sessionModel.js');
 const SalesforceOrg = require('../models/salesforceOrgModel.js');
-const role=require('../models/roleModel.js')
+const roles=require('../models/roleModel.js')
 
 //@desc     Auth User & Get Token
 //@route    POST api/users/login
@@ -56,7 +56,7 @@ exports.login = asyncHandler(async (req, res) => {
       ]);
 
       // Process role
-      const permission=await role.find({users:user._id}).lean().populate({
+      const permission=await roles.find({users:user._id}).lean().populate({
         path:'permissions',
         select:'_id name description sobject resource modules'
       })
@@ -128,12 +128,15 @@ exports.register = asyncHandler(async (req, res) => {
     };
 
     // Add role only if it exists in the request body
-    if (role) {
-      userData.role = role;
-    }
+  
 
     const user = await User.create(userData);
-
+    if (role) {
+      const roleData=await roles.findById(role)
+      roleData.users.push(user._id);
+      await roleData.save()
+  
+    }
     if (!user) {
       return res.status(400).json({
         message: "Invalid user data"
