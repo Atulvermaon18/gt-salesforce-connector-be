@@ -78,7 +78,7 @@ exports.login = asyncHandler(async (req, res) => {
         sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       });
-
+     let orgs= await SalesforceOrg.findOne().lean().select('orgId');
       return res.json({
         _id: user._id,
         userName: user.userName,
@@ -88,7 +88,7 @@ exports.login = asyncHandler(async (req, res) => {
         email: user.email,
         isActive: user.isActive,
         companyId: user.companyId,
-        orgIds: user.orgIds,
+        orgId: orgs.orgId,
         role:permission,
         token: accessToken,
       });
