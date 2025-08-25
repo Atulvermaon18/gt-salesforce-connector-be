@@ -844,7 +844,7 @@ exports.getLoginLogoutLogs = asyncHandler(async (req, res) => {
 
     const formattedLogs = sessions.map(session => ({
       username: session.userName,
-      email: session.userId.email,
+      email: session.userId?.email,
       loginTime: session.createdAt,
       logoutTime: session.updatedAt,
       ipAddress: session.ipAddress,

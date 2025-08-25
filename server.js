@@ -18,8 +18,7 @@ const cookieParser = require('cookie-parser');
 const { decryptRequest, encryptResponse } = require('./middlewares/encryptionMiddleware.js');
 const { setupOAuthRoutes } = require('./utils/setupOAuth.js');
 const userPreferenceRoutes = require('./routes/userPreferenceRoutes.js');
-const flowMetadataRoutes = require('./routes/flowMetadataRoutes.js');
-const flowAssignmentsRoutes = require('./routes/flowAssignmentsRoutes.js');
+const flowMetadataRoutes = require('./routes/flowMetadataRoutes.js'); 
 dotenv.config();
 
 
@@ -63,8 +62,7 @@ app.use("/api/permissions", permissionRoutes);
 app.use("/api/salesforce", salesforceRoutes);
 app.use("/api/sobjects", sobjectRoutes);
 app.use("/api/userPreference", userPreferenceRoutes);
-app.use ("/api/metadata",flowMetadataRoutes)
-app.use("/api/flowAssignments",flowAssignmentsRoutes)
+app.use ("/api/metadata",flowMetadataRoutes) 
 // app.use('/api',orgRoutes);
 
 app.get('/', (req, res) => {

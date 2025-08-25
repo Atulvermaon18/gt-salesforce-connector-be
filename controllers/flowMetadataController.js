@@ -34,6 +34,8 @@ exports.configMetadata = async (req, res) => {
     if (existingById) {
         existingById.configurationName=configurationName
       existingById.metadata = metadata;
+      existingById.associatedPages=associatedPages
+      existingById.n8n_url=n8n_url
       await existingById.save();
       return res.status(200).json({ message: "Metadata updated", data: existingById });
     }
@@ -71,7 +73,8 @@ exports.getMetadataById=async(req,res)=>{
 
 exports.processMetadata=async(req,res)=>{
     try{
-        const {orgId,id,processData,recordObjectId}=req.body
+        const {orgId,id,recordObjectId}=req.body
+        let {processData}=req.body
         const org=await SalesforceToken.findOne({ orgId });
         const {metadata,n8n_url}=await FlowMetadata.findOne({orgId,_id:id})
         
@@ -100,6 +103,22 @@ exports.processMetadata=async(req,res)=>{
                 };
                 const response = await n8nSalesforceApiRequest(axiosConfig);
                 console.log(response)
+            }
+            if(input.actionType=='GET_RECORD'){
+              const objectApiName = input.options[0]
+              const fields = input.options[1].join(',');
+              const query = `SELECT ${fields} FROM ${objectApiName}`;
+              const apiResponse = await n8nSalesforceApiRequest({
+                method: 'post',
+                url: process.env.N8N_URL,
+                data: {
+                  query: query,
+                  endpoint: "query"
+                },
+              });
+            
+                processData[input.apiName ]=apiResponse
+              
             }
         }
         if(n8n_url){  
