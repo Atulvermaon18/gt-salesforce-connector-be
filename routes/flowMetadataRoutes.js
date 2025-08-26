@@ -7,5 +7,5 @@ router.get('/assignedflows',metadataControler.getAssignedFlow)
 router.get('/:id',metadataControler.getMetadataById)
 router.post('/configuration',metadataControler.configMetadata)
 router.post('/process',metadataControler.processMetadata)
-
+router.delete('/:id', metadataControler.deleteMetadata)
 module.exports=router
