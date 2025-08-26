@@ -396,41 +396,41 @@ exports.getUsers = asyncHandler(async (req, res) => {
     // Get total count for pagination
     const total = await User.countDocuments(searchFilter);
 
-    // Regular sorting for fields directly on the user document
     const users = await User.find(searchFilter)
-      .select('-password -temporaryPassword')
-      .populate({
-        path: 'role',
-        select: '_id name description',
-        populate: {
-          path: 'permissions',
-          select: '_id name description'
-        }
-      })
-      .sort({ [sortField]: sortOrder })
-      .skip((page - 1) * limit)
-      .limit(limit);
-
-    const formattedUsers = users.map(user => ({
-      _id: user._id,
-      profileImage: user.profileImage,
-      userName: user.userName,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      phoneNumber: user.phoneNumber,
-      isActive: user.isActive,
-      role: user.role ? {
-        _id: user.role._id,
-        name: user.role.name,
-        description: user.role.description,
-        // permissions: user.role.permissions.map(permission => ({
-        //   _id: permission._id,
-        //   name: permission.name,
-        //   description: permission.description
-        // }))
-      } : null
-    }));
+    .select('-password -temporaryPassword') // exclude sensitive
+    .populate({
+      path: 'role',                // virtual role field
+      select: '_id name description',
+      // populate: {
+      //   path: 'permissions',       // inside role → populate permissions
+      //   select: '_id name description'
+      // }
+    })
+    .sort({ [sortField]: sortOrder })
+    .skip((page - 1) * limit)
+    .limit(limit);
+  
+  const formattedUsers = users.map(user => ({
+    _id: user._id,
+    profileImage: user.profileImage,
+    userName: user.userName,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    phoneNumber: user.phoneNumber,
+    isActive: user.isActive,
+    role: user.role ? {
+      _id: user.role._id,
+      name: user.role.name,
+      description: user.role.description,
+      permissions: user.role.permissions?.map(permission => ({
+        _id: permission._id,
+        name: permission.name,
+        description: permission.description
+      }))
+    } : null
+  }));
+  
 
     // Send response with pagination info
     return res.json({
@@ -539,13 +539,22 @@ exports.updateUserById = asyncHandler(async (req, res) => {
     
     // Handle role update - take the first role if array is provided
     if (req.body?.role) {
-      if (Array.isArray(req.body.role)) {
-        user.role = req.body.role[0]; // Take the first role from the array
-      } else {
-        user.role = req.body.role;
+      // 1. Find the current role that has this user
+      const oldRole = await roles.findOne({ users: req.params.userId });
+    
+      if (oldRole) {
+        oldRole.users.pull(req.params.userId); // remove from old role
+        await oldRole.save();
+      }
+    
+      // 2. Add user to the new role
+      const newRole = await roles.findById(req.body.role);
+    
+      if (newRole && !newRole.users.includes(req.params.userId)) {
+        newRole.users.push(req.params.userId);
+        await newRole.save();
       }
     }
-
     const updatedUser = await user.save();
 
     // Fetch the updated user with populated roles and permissions
