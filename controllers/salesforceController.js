@@ -407,7 +407,7 @@ exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
       const fieldName = `${item.relationshipName}Id`;
       item['data'] = apiResponse[0][fieldName];
       if (item['data']) {
-        const query = `SELECT Id ,Name FROM ${item.objectApiName} WHERE Id = '${item['data']}'`;
+        const query = `SELECT Id ,Name FROM ${item.objectApiName} WHERE  Id = '${item['data']}'`;
 
         const responseData = await n8nSalesforceApiRequest({
           method: 'post',
@@ -417,7 +417,7 @@ exports.salesforceGetObjectById = asyncHandler(async (req, res) => {
             endpoint: "query"
           },
         });
-        item['Name'] = responseData[0].Name
+        item['Name'] = responseData[0]?.Name
         console.log(responseData)
       }
     }
@@ -484,16 +484,21 @@ exports.salesforceDescribe = asyncHandler(async (req, res) => {
     delete objectDescription[0].urls;
       for(const field of objectDescription[0].fields){
         if(field.type === 'reference' && field.createable && !field.autoNumber && !field.calculated){
-          let query = `SELECT Id,Name FROM ${field.referenceTo[0]}`; 
-          const apiResponse = await n8nSalesforceApiRequest({
-            method: 'post',
-            url: process.env.N8N_URL,
-            data: {
-              query: query,
-              endpoint: "query"
-            },
-          });
-          field['referenceOptions'] = apiResponse;
+         
+          if(!field['referenceOptions']) field['referenceOptions'] = [];
+          for (const refTo of field.referenceTo) {
+            const query = `SELECT ${objectApiName == 'Case' ? 'Id' : 'Id,Name'} FROM ${refTo}`;
+            const apiResponse = await n8nSalesforceApiRequest({
+              method: 'post',
+              url: process.env.N8N_URL,
+              data: {
+                query: query,
+                endpoint: "query"
+              },
+            });
+            field['referenceOptions'] = [...field['referenceOptions'], ...apiResponse];
+          }
+          
         }
       }
         
@@ -774,7 +779,8 @@ exports.objectFieldValues = asyncHandler(async (req, res) => {
     if (!org) {
       return res.status(404).json({ message: 'Salesforce org not found' });
     }
-    const query = `SELECT ${fieldName} FROM ${objectApiName}`;
+   
+    const query = `SELECT ${ fieldName =='Id' ? 'Id,Name' : fieldName} FROM ${objectApiName}`;
 
     const apiResponse = await n8nSalesforceApiRequest({
       method: 'post',

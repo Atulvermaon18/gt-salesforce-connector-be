@@ -78,7 +78,7 @@ exports.processMetadata=async(req,res)=>{
         const org=await SalesforceToken.findOne({ orgId });
         const {metadata,n8n_url}=await FlowMetadata.findOne({orgId,_id:id})
         
-
+        // let manditaryFieldsTOCreateRecord=''
         for(const input of metadata[0].inputs){
             if(input.actionType=='UPDATE_RECORD')
             {
@@ -104,6 +104,41 @@ exports.processMetadata=async(req,res)=>{
                 const response = await n8nSalesforceApiRequest(axiosConfig);
                 console.log(response)
             }
+            // if(input.actionType=='CREATE_RECORD')
+            // {
+
+            //     const{apiName}= input 
+            //     // if OwnerId is not present in the manditaryFieldsTOCreateRecord then add it
+            //     if(!manditaryFieldsTOCreateRecord.OwnerId){
+            //       manditaryFieldsTOCreateRecord={
+            //         OwnerId:processData[apiName]
+            //     } 
+            //     }
+            //     else{
+            //       const {objectApiName,field }=input.record_create_object
+            //       const  object={
+            //         ...manditaryFieldsTOCreateRecord,
+            //         [field]:processData[apiName]
+            //       }
+            //       const payload={
+            //         "url": `${org.instanceUrl}/services/data/v57.0/sobjects/${objectApiName}`,
+            //         "method": "POST",
+            //         "endpoint": "record",
+            //         "body": object
+            //       }
+            //       const axiosConfig = {
+            //         method: 'post',
+            //         url: process.env.N8N_URL,
+            //         headers: {
+            //           'Content-Type': 'application/json',
+            //         },
+            //         data: payload
+            //       };
+            //       const response = await n8nSalesforceApiRequest(axiosConfig);
+            //       console.log(response)
+            //     }
+              
+            // }
             if(input.actionType=='GET_RECORD'){
               const objectApiName = input.options[0]
               const fields = input.options[1].join(',');
