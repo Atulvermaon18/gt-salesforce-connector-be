@@ -798,4 +798,57 @@ exports.objectFieldValues = asyncHandler(async (req, res) => {
     console.error('Error fetching related objects:', error.message);
     res.status(500).json({ message: 'Error fetching related objects', error: error.message });
   }
+});
+
+//@desc     Get Salesforce API usage limits
+//@route    GET /api/salesforce/limits
+//@access   Private
+exports.getSalesforceLimits = asyncHandler(async (req, res) => {
+  try {
+    const { orgId } = req.query;
+    
+    // Validate required parameters
+    if (!orgId) {
+      return res.status(400).json({ message: 'orgId is required' });
+    }
+
+    // Find the Salesforce org in the database
+    const org = await SalesforceToken.findOne({ orgId });
+    if (!org) {
+      return res.status(404).json({ message: 'Salesforce org not found' });
+    }
+
+    // Construct the Salesforce Limits API endpoint URL
+    const url = `${org.instanceUrl}/services/data/v57.0/limits`;
+
+    // Prepare the payload for n8n request
+    const payload = {
+      url: url,
+      method: "GET",
+      endpoint: "record",
+      body: {}
+    };
+
+    // Configure axios request
+    const axiosConfig = {
+      method: 'post',
+      url: process.env.N8N_URL,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      data: payload
+    };
+
+    // Make the API request through n8n
+    const response = await n8nSalesforceApiRequest(axiosConfig);
+
+    // Return the limits data
+    res.status(200).json(response[0]);
+  } catch (error) {
+    console.error('Error fetching Salesforce limits:', error.message);
+    res.status(500).json({ 
+      message: 'Error fetching Salesforce limits', 
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
+  }
 }); 
